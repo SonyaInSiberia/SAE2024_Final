@@ -68,4 +68,5 @@ Some special features to be futher explored:
 ### Other references
 
 - [6] J. Ćavar and L. Dolecki, “Exploring AU Sampler - Apple’s Mysterious Sampler Audio Unit.” Accessed: Feb. 06, 2024. [Online]. Available: <https://infinum.com/blog/getting-started-with-au-sampler/>
-- *Not Really* ongoing sampler built with Rust on Github: [8] “RustSampler.” GitHub, Nov. 11, 2023. Accessed: Feb. 06, 2024. [Online]. Available: <https://github.com/soakyaudio/sampler>
+- ~~Not Really~~ ongoing sampler built with Rust on Github: [8] “RustSampler.” GitHub, 2021. Accessed: Feb. 06, 2024. [Online]. Available: <https://github.com/soakyaudio/sampler>
+- An archived repo that might be useful: [9] “RustSampler.” GitHub, 2021. Accessed: Feb. 06, 2024. [Online]. Available: <https://crates.io/crates/sampler/0.2.0/dependencies>
