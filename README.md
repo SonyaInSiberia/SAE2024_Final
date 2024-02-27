@@ -20,6 +20,14 @@
 
 - A low level data structure which can stream a sample from disc and load it into memory
 
+### High level audio graph:
+
+**MIDI Device in DAW** -> **Sampler Voice (audio buffer)** -> **Sampler Engine** -> **ADSR Module** -> **Output Audio Buffer**
+
+### Platform of choice: VST Plugin [https://github.com/RustAudio/vst3-sys/](https://github.com/RustAudio/vst3-sys/)
+
+### Main Goal: Add SFZ support to existing sampler in VST wrapper: [https://github.com/sinshu/rustysynth/tree/main/rustysynth](https://github.com/sinshu/rustysynth/tree/main/rustysynth)
+
 ---
 
 ### functionality from user point of view and how it differentiates from similar products
@@ -32,7 +40,7 @@ The digital sampler software should be able to have the following funtionality:
 
 Some special features to be futher explored:
 
-- Real time sampling
+- Real time sampling (i.e. the ability to record a sample through the sampler then play it back as opposed to loading a file from the disk)
 - Filter options for samples
 
 ---
@@ -71,6 +79,8 @@ Some special features to be futher explored:
 #### Rust implementations
 - ~~Not Really~~ ongoing sampler built with Rust on Github: [8] “RustSampler.” GitHub, 2021. Accessed: Feb. 06, 2024. [Online]. Available: <https://github.com/soakyaudio/sampler>
 - An archived repo that might be useful: [9] “RustSampler.” GitHub, 2021. Accessed: Feb. 06, 2024. [Online]. Available: <https://crates.io/crates/sampler/0.2.0/dependencies>
-#### Language support
+#### Bonus
+While the main focus of our project will be a VST implementation purely in Rust, we recognize there are other plugin formats, such as [AUv3](https://developer.apple.com/documentation/audiotoolbox/audio_unit_v3_plug-ins), which are not language agnostic.
+Thus, we will link some resources here for exploring those formats for future developers who are interested. However, we will not implement these wrappers as it is outside the scope of this project.
 - Swift Rust bridge: <https://github.com/chinedufn/swift-bridge>
-- Swift Rus Audio Example: <https://github.com/cornedriesprong/SwiftRustAudioExample/tree/main>
+- Swift Rust Audio Example: <https://github.com/cornedriesprong/SwiftRustAudioExample/tree/main>
