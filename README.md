@@ -8,6 +8,9 @@
 - Allocate voices attached to a file or manage the number of active voices (voice stealing)
 - Load or configure sound banks, such as SFZ, sf2, aiff...
 
+##### For sample tests run this:
+- cargo run 'Audio Files/Cymatics - Fantasy - Juno 106 PLUCK Cute High - C.wav' 'Audio Files/cymatics_chords_high.wav' 60
+
 #### ADSR Module 📉 (Attack Decay Sustain Release)
 
 - Shapes the volume of the signal over time through an envelope generator or another trigger. See code reference of `adsr.c` from [7].
