@@ -1,5 +1,5 @@
 use std::borrow::Borrow;
-
+#[derive(Clone)]
 pub struct RingBuffer<T> {
     // TODO: fill this in.
     buffer :  Vec<T>,
@@ -94,6 +94,10 @@ impl<T: Copy + Default> RingBuffer<T> {
         // Return the length of the internal buffer.
         //todo!()
         self.buffer.len()
+    }
+
+    pub fn resize(&mut self, new_size: usize, value: T){
+        self.buffer.resize(new_size, value);
     }
 }
 impl RingBuffer<f32>{

@@ -1,10 +1,13 @@
 mod ring_buffer;
+mod adsr;
 use ring_buffer::RingBuffer;
-mod sample_voice;
+mod sampler_voice;
+mod sampler_engine;
 use hound::{WavReader, WavSpec, SampleFormat};
 use std::io::BufReader;
 use std::fs::File;
-use sample_voice::SampleVoice;
+use sampler_voice::SamplerVoice;
+use sampler_engine::SamplerEngine;
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let mut reader = hound::WavReader::open(&args[1]).unwrap();
@@ -14,9 +17,12 @@ fn main() {
     fill_buffer(&mut wav_as_ring, &mut reader);
     let base_note = 60;
     //let mut sampVoice = SampleVoice::new( channels,base_note);
-    let mut voices: Vec<SampleVoice> = (0..5)
-    .map(|_| SampleVoice::new(channels, base_note))
+    let mut voices: Vec<SamplerVoice> = (0..5)
+    .map(|_| SamplerVoice::new(channels, base_note))
     .collect();
+    let mut engine = SamplerEngine::new(44100.0,2,6,sampler_engine::SamplerMode::Warp);
+    engine.add_to_paths_and_load(&args[1], "file 1");
+    
 
     let newSpec = hound::WavSpec {
         channels: reader.spec().channels,
@@ -42,7 +48,7 @@ fn main() {
     for i in (0..wav_size){
         let mut outSample = 0.0;
         for voice in voices.iter_mut(){
-            outSample += voice.process(&mut wav_as_ring);
+            outSample += voice.processWarp(&mut wav_as_ring);
         }
         //let outSample = sampVoice.process(&mut wav_as_ring);
         writer.write_sample(outSample);
