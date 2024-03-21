@@ -81,8 +81,8 @@ impl ADSR{
     /// Sets attack in seconds
     pub fn set_attack(&mut self, attack_:f32){
 
-        if attack_ < 0.0{
-            self.atk_value = 0.0;
+        if attack_ <= 0.0{
+            self.atk_value = 0.00001;
         }else{
             self.atk_value = attack_;
         }
