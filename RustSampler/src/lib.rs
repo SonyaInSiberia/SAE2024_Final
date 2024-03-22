@@ -1,5 +1,10 @@
 use nih_plug::prelude::*;
 use std::sync::Arc;
+mod adsr;
+mod ring_buffer;
+mod sampler_voice;
+mod sampler_engine;
+use sampler_engine::{SamplerEngine,SamplerMode};
 
 // This is a shortened version of the gain example with most comments removed, check out
 // https://github.com/robbert-vdh/nih-plug/blob/master/plugins/examples/gain/src/lib.rs to get
@@ -7,6 +12,7 @@ use std::sync::Arc;
 
 struct RustSampler {
     params: Arc<RustSamplerParams>,
+    engine: Option<SamplerEngine>,
 }
 
 #[derive(Params)]
@@ -37,6 +43,8 @@ impl Default for RustSampler {
     fn default() -> Self {
         Self {
             params: Arc::new(RustSamplerParams::default()),
+            engine: None,
+
         }
     }
 }
@@ -91,14 +99,14 @@ impl Default for RustSamplerParams {
                 .with_smoother(SmoothingStyle::Linear(20.0))
                 .with_unit("ms"),
             start_point: FloatParam::new(
-                "Start Pointt",
+                "Start Point",
                 0.0, 
                 FloatRange::Linear { min: 0.0, max: 100.0})
                 .with_smoother(SmoothingStyle::Linear(20.0))
                 .with_unit("%")
                 .with_step_size(0.01),
             length: FloatParam::new(
-                "Decay",
+                "End Point",
                 100.0, 
                 FloatRange::Linear { min: 0.0, max: 100.0 })
                 .with_smoother(SmoothingStyle::Linear(20.0))
@@ -164,6 +172,11 @@ impl Plugin for RustSampler {
         // Resize buffers and perform other potentially expensive initialization operations here.
         // The `reset()` function is always called right after this function. You can remove this
         // function if you do not need it.
+        let mut engine_ = SamplerEngine::new(_buffer_config.sample_rate, 2);
+        self.engine = Some(engine_);
+        self.engine.as_mut().unwrap().load_file_from_path("/Users/davidjones/Desktop/0My_samples/808_drum_kit/808_drum_kit/classic 808/1 weird 808.wav");
+        self.engine.as_mut().unwrap().set_mode(SamplerMode::Warp);
+        self.engine.as_mut().unwrap().set_warp_base(64);
         true
     }
 
@@ -176,13 +189,32 @@ impl Plugin for RustSampler {
         &mut self,
         buffer: &mut Buffer,
         _aux: &mut AuxiliaryBuffers,
-        _context: &mut impl ProcessContext<Self>,
+        context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
+        let mut next_event = context.next_event();
         for channel_samples in buffer.iter_samples() {
             // Smoothing is optionally built into the parameters themselves
-            let gain = self.params.gain.smoothed.next();
-
+            while let Some(event) = next_event{
+                match event{
+                    NoteEvent::NoteOn { note, velocity, .. } => {
+                        self.engine.as_mut().unwrap().note_on(note, velocity);
+                        panic!("A note has been played!!!!!!");
+                    }
+                    NoteEvent::NoteOff { note, .. } => {
+                        self.engine.as_mut().unwrap().note_off(note);
+                    }
+                    _ => (),
+                }
+                next_event = context.next_event();
+            }
             for sample in channel_samples {
+                let gain = self.params.gain.smoothed.next();
+                let attack = self.params.attack.smoothed.next()*0.001;
+                let decay = self.params.decay.smoothed.next()*0.001;
+                let sustain = self.params.sustain.smoothed.next();
+                let release = self.params. release.smoothed.next()*0.001;
+                self.engine.as_mut().unwrap().set_adsr(attack, decay, sustain, release);
+                *sample = self.engine.as_mut().unwrap().process();
                 *sample *= gain;
             }
         }
