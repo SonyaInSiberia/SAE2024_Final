@@ -114,7 +114,7 @@ impl Default for RustSamplerParams {
                 .with_step_size(0.01),
             num_voices: IntParam::new( //Max Number of Voices
                 "Voices",
-                8,
+                6,
                 IntRange::Linear { min: 1, max: 24 }
             ),
         }
@@ -145,7 +145,7 @@ impl Plugin for RustSampler {
     }];
 
 
-    const MIDI_INPUT: MidiConfig = MidiConfig::None;
+    const MIDI_INPUT: MidiConfig = MidiConfig::Basic;
     const MIDI_OUTPUT: MidiConfig = MidiConfig::None;
 
     const SAMPLE_ACCURATE_AUTOMATION: bool = true;
@@ -174,7 +174,9 @@ impl Plugin for RustSampler {
         // function if you do not need it.
         let mut engine_ = SamplerEngine::new(_buffer_config.sample_rate, 2);
         self.engine = Some(engine_);
+        // Tests to see if second file will overwrite first file
         self.engine.as_mut().unwrap().load_file_from_path("/Users/davidjones/Desktop/0My_samples/808_drum_kit/808_drum_kit/classic 808/1 weird 808.wav");
+        self.engine.as_mut().unwrap().add_to_paths_and_load("/Users/davidjones/Desktop/0My_samples/Cymatics - Fantasy Synth Sample Pack/One Shots/Cymatics - Fantasy - Juno 106 BASS Rubber - C.wav");
         self.engine.as_mut().unwrap().set_mode(SamplerMode::Warp);
         self.engine.as_mut().unwrap().set_warp_base(64);
         true
@@ -194,11 +196,11 @@ impl Plugin for RustSampler {
         let mut next_event = context.next_event();
         for channel_samples in buffer.iter_samples() {
             // Smoothing is optionally built into the parameters themselves
+            // TODO: Find out why no audio... not getting midi messages
             while let Some(event) = next_event{
                 match event{
                     NoteEvent::NoteOn { note, velocity, .. } => {
                         self.engine.as_mut().unwrap().note_on(note, velocity);
-                        panic!("A note has been played!!!!!!");
                     }
                     NoteEvent::NoteOff { note, .. } => {
                         self.engine.as_mut().unwrap().note_off(note);
@@ -212,7 +214,9 @@ impl Plugin for RustSampler {
                 let attack = self.params.attack.smoothed.next()*0.001;
                 let decay = self.params.decay.smoothed.next()*0.001;
                 let sustain = self.params.sustain.smoothed.next();
-                let release = self.params. release.smoothed.next()*0.001;
+                let release = self.params.release.smoothed.next()*0.001;
+                let num_voices = self.params.num_voices.value();
+                self.engine.as_mut().unwrap().set_num_voices(num_voices as u8);
                 self.engine.as_mut().unwrap().set_adsr(attack, decay, sustain, release);
                 *sample = self.engine.as_mut().unwrap().process();
                 *sample *= gain;
@@ -230,7 +234,7 @@ impl ClapPlugin for RustSampler {
     const CLAP_SUPPORT_URL: Option<&'static str> = None;
 
     // Don't forget to change these features
-    const CLAP_FEATURES: &'static [ClapFeature] = &[ClapFeature::AudioEffect, ClapFeature::Stereo];
+    const CLAP_FEATURES: &'static [ClapFeature] = &[ClapFeature::AudioEffect, ClapFeature::Stereo, ClapFeature::Instrument];
 }
 
 impl Vst3Plugin for RustSampler {
@@ -238,7 +242,8 @@ impl Vst3Plugin for RustSampler {
 
     // And also don't forget to change these categories
     const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] =
-        &[Vst3SubCategory::Fx, Vst3SubCategory::Dynamics];
+        &[Vst3SubCategory::Fx, Vst3SubCategory::Dynamics, 
+        Vst3SubCategory::Generator,Vst3SubCategory::Instrument];
 }
 
 nih_export_clap!(RustSampler);
