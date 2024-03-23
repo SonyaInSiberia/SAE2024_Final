@@ -25,7 +25,7 @@ pub enum SamplerMode{
 }
 
 impl SamplerEngine{
-    pub fn new(sample_rate_: f32, num_channels_: usize, num_voices_: u8, sampler_mode_: SamplerMode) -> Self{
+    pub fn new(sample_rate_: f32, num_channels_: usize) -> Self{
         
         let files = vec!["".to_string();100];
         let buff = RingBuffer::<f32>::new(1);
@@ -33,11 +33,11 @@ impl SamplerEngine{
         let other_voices = vec![SamplerVoice::new(num_channels_,64);1];
 
         let mut engine = SamplerEngine{
-            num_voices: num_voices_,
+            num_voices: 6,
             sound_bank: HashMap::with_capacity(30),
             file_names: files,
             warp_buffer: buff,
-            sampler_mode: sampler_mode_,
+            sampler_mode: SamplerMode::Warp,
             warp_voices: voices_,
             assign_voices: other_voices,
             sample_rate: sample_rate_,
@@ -103,7 +103,7 @@ impl SamplerEngine{
 
     /// Triggers a "note on" message and allocates a voice, 
     ///  stealing if necessary
-    pub fn note_on(&mut self, note: u8, velocity: u8){
+    pub fn note_on(&mut self, note: u8, velocity: f32){
         match self.sampler_mode {
             SamplerMode::Warp =>{
                 let voice_id = self.get_voice_id();

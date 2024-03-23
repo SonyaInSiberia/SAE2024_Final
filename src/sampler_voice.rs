@@ -78,10 +78,9 @@ impl SamplerVoice{
         self.phase_step = 2.0_f32.powf(offset as f32 / 12.0);
     }
     /// Triggers attack on ADSR and starts playback of the audio file
-    pub fn note_on(&mut self, note: u8, velocity: u8){
+    pub fn note_on(&mut self, note: u8, velocity: f32){
         if self.sus_is_velo {
-            let float_velo = velocity as f32 / 127.0;
-            self.adsr.set_sustain(float_velo);
+            self.adsr.set_sustain(velocity);
         }
         self.phase_offset = 0.0;
         self.set_note(note);

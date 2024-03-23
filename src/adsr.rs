@@ -104,8 +104,8 @@ impl ADSR{
     }
 
     pub fn set_release(&mut self, release_:f32){
-        if release_ < 0.0{
-            self.rel_value = 0.0;
+        if release_ <= 0.0{
+            self.rel_value = 0.00001;
         }else{
             self.rel_value = release_;
         }

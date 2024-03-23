@@ -21,7 +21,7 @@ fn main() {
     .map(|_| SamplerVoice::new(channels, base_note))
     .collect(); */
     let new_sample_rate = 48000.0;
-    let mut engine = SamplerEngine::new(new_sample_rate,2,6,sampler_engine::SamplerMode::Warp);
+    let mut engine = SamplerEngine::new(new_sample_rate,2);
     engine.add_to_paths_and_load(&args[1]);
     engine.set_warp_base(base_note);
     engine.assign_file_to_midi(&args[1], 60);
@@ -48,20 +48,20 @@ fn main() {
             outSample += voice.processWarp(&mut wav_as_ring);
         } */
         if i == 1000{
-            engine.note_on(30,127);
+            engine.note_on(30,1.0);
         }
         if i == 48000-30000 {
-            engine.note_on(60, 127)
+            engine.note_on(60, 1.0)
         }
         if i == 58000-30000{
-            engine.note_on(63, 127);
+            engine.note_on(63, 1.0);
         }
         if i == 70000-30000{
-            engine.note_on(48, 127);
-            engine.note_on(51, 127);
+            engine.note_on(48, 1.0);
+            engine.note_on(51, 1.0);
         }
         if i == 60000-30000{
-            engine.note_on(59,127);
+            engine.note_on(59,1.0);
         }
         if i == 100000{
             engine.note_off(60);
