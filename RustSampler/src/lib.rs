@@ -37,6 +37,12 @@ struct RustSamplerParams {
     pub end_point: FloatParam,
     #[id = "num_voices"]
     pub num_voices: IntParam,
+    #[id = "sus_start"]
+    pub sus_start: FloatParam,
+    #[id = "sus_end"]
+    pub sus_end: FloatParam,
+    #[id = "sus_looping"]
+    pub sus_looping: BoolParam,
 }
 
 impl Default for RustSampler {
@@ -117,6 +123,23 @@ impl Default for RustSamplerParams {
                 6,
                 IntRange::Linear { min: 1, max: 24 }
             ),
+            sus_start: FloatParam::new(
+                "Sustain Start",
+                40.0, 
+                FloatRange::Linear { min: 0.0, max: 100.0})
+                .with_smoother(SmoothingStyle::Linear(20.0))
+                .with_unit("%")
+                .with_step_size(0.001),
+            sus_end: FloatParam::new(
+                "Sustain End",
+                60.0, 
+                FloatRange::Linear { min: 0.0, max: 100.0 })
+                .with_smoother(SmoothingStyle::Linear(20.0))
+                .with_unit("%")
+                .with_step_size(0.001),
+            sus_looping: BoolParam::new(
+                "Sustain Looping", 
+                false),
         }
     }
 }
@@ -218,9 +241,14 @@ impl Plugin for RustSampler {
                 let num_voices = self.params.num_voices.value();
                 let start = self.params.start_point.smoothed.next();
                 let end = self.params.end_point.smoothed.next();
+                let sus_start = self.params.sus_start.smoothed.next();
+                let sus_end = self.params.sus_end.smoothed.next();
+                let sus_looping = self.params.sus_looping.value();
                 self.engine.as_mut().unwrap().set_num_voices(num_voices as u8);
                 self.engine.as_mut().unwrap().set_adsr(attack, decay, sustain, release);
                 self.engine.as_mut().unwrap().set_points_warp(start, end);
+                self.engine.as_mut().unwrap().set_sus_looping_warp(sus_looping);
+                self.engine.as_mut().unwrap().set_sus_points_warp(sus_start, sus_end);
                 *sample = self.engine.as_mut().unwrap().process();
                 *sample *= gain;
             }

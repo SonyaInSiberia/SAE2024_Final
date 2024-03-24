@@ -3,7 +3,7 @@ use std::clone;
 use crate::ring_buffer;
 use ring_buffer::RingBuffer;
 use crate::adsr;
-use adsr::ADSR;
+use adsr::{ADSR, AdsrState};
 #[derive(Clone)]
 pub struct SamplerVoice{
     phase_offset: f32,
@@ -16,6 +16,9 @@ pub struct SamplerVoice{
     start_point: f32,
     end_point: f32,
     reversed: bool,
+    pub sus_looping: bool,
+    sus_start: f32,
+    sus_end: f32,
 }
 
 impl SamplerVoice{
@@ -23,7 +26,7 @@ impl SamplerVoice{
     /// based on a midi note or plays back an assigned file
     pub fn new(num_channesls_: usize, base_midi_: u8)->Self{
         let adsr_ = ADSR::new(44100.0, 0.2, 0.1,0.5,0.2);
-        let mut voice = SamplerVoice{
+        SamplerVoice{
             phase_offset: 0.0,
             phase_step: 1.0,
             midi_note: 0,
@@ -34,20 +37,23 @@ impl SamplerVoice{
             start_point: 0.0,
             end_point: -1.0,
             reversed: false,
-        };
-        voice
+            sus_looping: false,
+            sus_start: -1.0,
+            sus_end: -1.0,
+        }
     }
     ///Reads from the loaded sample file
     /// Uses the get_frac function in the ring_buffer, which returns the sample
     /// at a fractional index
     pub fn processWarp(&mut self, buffer: &mut RingBuffer<f32>, sr_scalar: f32)->f32{
-        if self.end_point == -1.0{
-            self.end_point = buffer.capacity() as f32;
-        }
+        self.check_inits(buffer.capacity());
         if self.adsr.is_active(){
             let sample = buffer.get_frac(self.phase_offset);
             if !self.reversed{
                 self.phase_offset += self.phase_step * sr_scalar;
+                if self.sus_looping && self.adsr.state==AdsrState::Sustain && self.phase_offset >= self.sus_end{
+                    self.phase_offset = self.sus_start;
+                }
                 if self.phase_offset >= self.end_point{
                     self.phase_step = 0.0;
                     self.phase_offset = self.start_point;
@@ -55,6 +61,9 @@ impl SamplerVoice{
                 }
             }else{     
                 self.phase_offset -= self.phase_step * sr_scalar;
+                if self.sus_looping && self.adsr.state==AdsrState::Sustain && self.phase_offset <= self.sus_start{
+                    self.phase_offset = self.sus_end;
+                }
                 if self.phase_offset <= self.end_point{
                     self.phase_step = 0.0;
                     self.phase_offset = self.start_point;
@@ -72,13 +81,14 @@ impl SamplerVoice{
     /// 
     /// Essentially, it just reads through the given buffer
     pub fn processAssign(&mut self, buffer: &mut RingBuffer<f32>, sr_scalar: f32)->f32{
-        if self.end_point == -1.0{
-            self.end_point = buffer.capacity() as f32;
-        }
+        self.check_inits(buffer.capacity());
         if self.adsr.is_active(){
             let sample = buffer.get_frac(self.phase_offset);
             if !self.reversed{
                 self.phase_offset += 1.0 * sr_scalar;
+                if self.sus_looping && self.phase_offset >= self.sus_end{
+                    self.phase_offset = self.sus_start;
+                }
                 if self.phase_offset >= self.end_point{
                     self.phase_step = 0.0;
                     self.phase_offset = self.start_point;
@@ -86,6 +96,9 @@ impl SamplerVoice{
                 }
             }else{
                 self.phase_offset -= 1.0 * sr_scalar;
+                if self.sus_looping && self.adsr.state==AdsrState::Sustain && self.phase_offset <= self.sus_start{
+                    self.phase_offset = self.sus_end;
+                }
                 if self.phase_offset <= self.end_point{
                     self.phase_step = 0.0;
                     self.phase_offset = self.start_point;
@@ -153,12 +166,65 @@ impl SamplerVoice{
         self.set_start_point(start_point,length);
         self.set_end_point(end_point,length);
     }
+    /// Sets the start point of the sustain loop. If reversed, start_point will serve
+    /// as end_point. Values will be clamped within start and end points of the 
+    /// sample as a whole.
+    /// 
+    /// start_point: (0%-100%)
+    pub fn set_sus_start(&mut self, start_point: f32, length: usize){
+        let mut point = 0.01 * fclamp(start_point, 0.0, 100.0) * length as f32;
+        if !self.reversed{
+            if point < self.start_point {point = self.start_point;}
+            if point >= self.sus_end {point = self.sus_end-10.0}
+            if point >= self.end_point {point = self.end_point-10.0}
+        }else{
+            if point < self.end_point {point = self.end_point;}
+            if point >= self.sus_end {point = self.sus_end-10.0}
+            if point >= self.start_point {point = self.start_point-10.0}
+        }
+        self.sus_start = point;
+    }
+    /// Sets the end point of the sustain loop. If reversed, end_point will serve
+    /// as start_point. Values will be clamped within start and end points of the 
+    /// sample as a whole.
+    /// 
+    /// end_point: (0%-100%)
+    pub fn set_sus_end(&mut self, end_point: f32, length: usize){
+        let mut point = 0.01 * fclamp(end_point, 0.0, 100.0) * length as f32;
+        if !self.reversed{
+            if point <= self.start_point {point = self.start_point+10.0;}
+            if point <= self.sus_start {point = self.sus_start+10.0}
+            if point > self.end_point {point = self.end_point}
+        }else{
+            if point <= self.end_point {point = self.end_point+10.0;}
+            if point <= self.sus_start {point = self.sus_end+10.0}
+            if point > self.start_point {point = self.start_point}
+        }
+        self.sus_end = point;
+    }
+    /// Sets the start and end points for the sustain loop. If reversed, end_point will serve
+    /// as start_point. Values will be clamped within start and end points of the 
+    /// sample as a whole.
+    /// 
+    /// start_point: (0%-100%),  end_point: (0%-100%)
+    pub fn set_sus_points(&mut self, start_point: f32, end_point: f32, length: usize){
+        self.set_sus_start(start_point, length);
+        self.set_sus_end(end_point, length);
+    }
     /// Returns a tuple containing the start and end points (in percent) of the sampler voice
     /// 
     /// Returns in the format: (start_point, end_point)
     pub fn get_points(&mut self, length: usize)-> (f32, f32){
         let start_point = self.start_point * 100.0 / length as f32;
         let end_point  = self.end_point * 100.0 / length as f32;
+        (start_point,end_point)
+    }
+    /// Returns a tuple containing the start and end points (in percent) of the sustain loop
+    /// 
+    /// Returns in the format: (start_point, end_point)
+    pub fn get_sus_points(&mut self, length: usize)->(f32, f32){
+        let start_point = self.sus_start * 100.0 / length as f32;
+        let end_point  = self.sus_end * 100.0 / length as f32;
         (start_point,end_point)
     }
     /// Returns whether or not the ADSR is active.
@@ -170,6 +236,17 @@ impl SamplerVoice{
     /// Sets center midi note upon which sample warping is wrapped
     pub fn set_base_midi(&mut self, note: u8){
         self.base_midi = note;
+    }
+    fn check_inits(&mut self, capacity: usize){
+        if self.end_point == -1.0{
+            self.end_point = capacity as f32;
+        }
+        if self.sus_start == -1.0{
+            self.sus_start = 0.4 * capacity as f32;
+        }
+        if self.sus_end == -1.0{
+            self.sus_end = 0.6 * capacity as f32;
+        }
     }
 
 }
