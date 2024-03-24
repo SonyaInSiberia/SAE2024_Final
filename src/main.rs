@@ -10,16 +10,8 @@ use sampler_voice::SamplerVoice;
 use sampler_engine::SamplerEngine;
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    /* let mut reader = hound::WavReader::open(&args[1]).unwrap();
-    let wav_size = reader.len();
-    let channels = reader.spec().channels as usize;
-    let mut wav_as_ring = RingBuffer::<f32>::new(wav_size as usize);
-    fill_buffer(&mut wav_as_ring, &mut reader); */
+
     let base_note = 60;
-    //let mut sampVoice = SampleVoice::new( channels,base_note);
-    /* let mut voices: Vec<SamplerVoice> = (0..5)
-    .map(|_| SamplerVoice::new(channels, base_note))
-    .collect(); */
     let new_sample_rate = 48000.0;
     let mut engine = SamplerEngine::new(new_sample_rate,2);
     engine.add_to_paths_and_load(&args[1]);
@@ -27,6 +19,8 @@ fn main() {
     engine.assign_file_to_midi(&args[1], 60);
     engine.assign_file_to_midi(&args[2], 51);
     engine.assign_file_to_midi(&args[3], 48);
+    engine.set_sus_looping_assign(true, 51);
+    engine.set_sus_looping_warp(true);
 
     let newSpec = hound::WavSpec {
         channels: 2,
@@ -34,21 +28,16 @@ fn main() {
         bits_per_sample: 32,
         sample_format: hound::SampleFormat::Float,
     };
-    engine.set_mode(sampler_engine::SamplerMode::Assign);
-    engine.set_adsr(0.0, 0.1, 0.1, 0.4);
+    engine.set_mode(sampler_engine::SamplerMode::Warp);
+    engine.set_adsr(0.0, 0.0, 1.0, 0.4);
     engine.set_adsr_assign(1.0, 0.0, 1.0, 0.2, 60);
-    engine.set_points_assign(50.0, 0.0, 51);
+    engine.set_adsr_assign(0.0, 0.0, 1.0, 0.3, 51);
+    engine.set_points_assign(0.0, 100.0, 51);
+    engine.set_sus_points_assign(0.0, 1.0, 51);
 
-   /*  for (i,voice) in voices.iter_mut().enumerate(){
-        voice.set_note(base_note + (i as u8 * 5));
-    } */
-    //sampVoice.set_note(midi_note);
     let mut writer = hound::WavWriter::create(&args[4], newSpec).unwrap();
-    for i in (0..48000*10){
+    for i in (0..480000){
         let mut outSample = 0.0;
-        /* for voice in voices.iter_mut(){
-            outSample += voice.processWarp(&mut wav_as_ring);
-        } */
         if i == 1000{
             engine.note_on(30,1.0);
         }
@@ -69,8 +58,10 @@ fn main() {
             engine.note_off(60);
             engine.note_off(63);
             engine.note_off(48);
-            engine.note_off(51);
             engine.note_off(59);
+        }
+        if i == 400000{
+            engine.note_off(51);
         }
         outSample = engine.process();
         //let outSample = sampVoice.process(&mut wav_as_ring);

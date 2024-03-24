@@ -230,6 +230,55 @@ impl SamplerEngine{
             (0.0,100.0)// Return defaults if note not found
         }
     }
+    /// Sets the start and end points of the warp buffer's sustain looping. Values will be clamped
+    /// within start and end points of the sample as a whole
+    pub fn set_sus_points_warp(&mut self, start_point: f32, end_point: f32){
+        for voice in self.warp_voices.iter_mut(){
+            voice.set_sus_points(start_point, end_point, self.warp_buffer.capacity());
+        }
+    }
+    /// Gets the start and end points for the sustain loop of the warp sampler.
+    /// 
+    /// Returns tuple in the format: (start_point, end_point)
+    pub fn get_sus_points_warp(&mut self)->(f32,f32){
+        self.warp_voices[0].get_sus_points(self.warp_buffer.capacity())
+    }
+    /// Sets the start and end points of the assigned buffer's sustain looping. Values will be clamped
+    /// within start and end points of the sample as a whole
+    pub fn set_sus_points_assign(&mut self, start_point: f32, end_point: f32, note_of_assigned: u8){
+        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+            // Entry exists, update the points
+            voice.set_sus_points(start_point, end_point, buff.capacity());
+        } else {
+            // Entry does not exist, handle the error (e.g., log an error message)
+            eprintln!("Entry for note {} does not exist in sound bank", note_of_assigned);
+        }
+    }
+    /// Gets the start and end points for the sustain loop of the assigned note.
+    /// 
+    /// Returns tuple in the format: (start_point, end_point)
+    pub fn get_sus_points_assign(&mut self, note_of_assigned: u8)->(f32,f32){
+        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+            // Entry exists, update the points
+            voice.get_sus_points(buff.capacity())
+        } else{
+            (0.0,100.0)// Return defaults if note not found
+        }
+    }
+    pub fn set_sus_looping_warp(&mut self, activator: bool){
+        for voice in self.warp_voices.iter_mut(){
+            voice.sus_looping = activator;
+        }
+    }
+    pub fn set_sus_looping_assign(&mut self, activator: bool, note_of_assigned: u8){
+        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+            // Entry exists, update the points
+            voice.sus_looping = activator;
+        } else {
+            // Entry does not exist, handle the error (e.g., log an error message)
+            eprintln!("Entry for note {} does not exist in sound bank", note_of_assigned);
+        }
+    }
     /// Chooses a voice and steals the quietest one
     fn get_voice_id(&mut self)-> usize{
         for (voice_id, voice) in self.warp_voices.iter_mut().enumerate() {
