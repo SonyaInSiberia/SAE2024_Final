@@ -47,12 +47,11 @@ impl SamplerVoice{
         if self.adsr.is_active(){
             let sample = buffer.get_frac(self.phase_offset);
             if !self.reversed{
-                self.phase_offset += self.phase_step * sr_scalar*-1.0;
+                self.phase_offset += self.phase_step * sr_scalar;
                 if self.phase_offset >= self.end_point{
                     self.phase_step = 0.0;
                     self.phase_offset = self.start_point;
                     return 0.0
-                    //self.phase_offsets[self.channel_id] -= self.buffers[0].capacity() as f32;
                 }
             }else{     
                 self.phase_offset -= self.phase_step * sr_scalar;
@@ -60,10 +59,8 @@ impl SamplerVoice{
                     self.phase_step = 0.0;
                     self.phase_offset = self.start_point;
                     return 0.0
-                    //self.phase_offsets[self.channel_id] -= self.buffers[0].capacity() as f32;
                 }
             }
-               
             sample * self.adsr.getNextSample()
         }else{
             self.phase_offset = self.start_point;
@@ -114,7 +111,7 @@ impl SamplerVoice{
         if self.sus_is_velo {
             self.adsr.set_sustain(velocity);
         }
-        self.phase_offset = 0.0;
+        self.phase_offset = self.start_point;
         self.set_note(note);
         self.adsr.note_on();
     }
