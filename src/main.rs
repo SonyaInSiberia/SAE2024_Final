@@ -35,7 +35,9 @@ fn main() {
         sample_format: hound::SampleFormat::Float,
     };
     engine.set_mode(sampler_engine::SamplerMode::Assign);
-    engine.set_adsr(0.1, 0.1, 0.1, 0.4);
+    engine.set_adsr(0.0, 0.1, 0.1, 0.4);
+    engine.set_adsr_assign(1.0, 0.0, 1.0, 0.2, 60);
+    engine.set_points_assign(50.0, 0.0, 51);
 
    /*  for (i,voice) in voices.iter_mut().enumerate(){
         voice.set_note(base_note + (i as u8 * 5));
@@ -57,7 +59,7 @@ fn main() {
             engine.note_on(63, 1.0);
         }
         if i == 70000-30000{
-            engine.note_on(48, 1.0);
+            engine.note_on(49, 1.0);
             engine.note_on(51, 1.0);
         }
         if i == 60000-30000{

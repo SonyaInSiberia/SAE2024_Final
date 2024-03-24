@@ -13,6 +13,9 @@ pub struct SamplerVoice{
     num_channels: usize,
     pub adsr: ADSR,
     pub sus_is_velo: bool,
+    start_point: f32,
+    end_point: f32,
+    reversed: bool,
 }
 
 impl SamplerVoice{
@@ -28,7 +31,9 @@ impl SamplerVoice{
             num_channels: num_channesls_,
             adsr: adsr_,
             sus_is_velo: false,
-
+            start_point: 0.0,
+            end_point: -1.0,
+            reversed: false,
         };
         voice
     }
@@ -36,18 +41,32 @@ impl SamplerVoice{
     /// Uses the get_frac function in the ring_buffer, which returns the sample
     /// at a fractional index
     pub fn processWarp(&mut self, buffer: &mut RingBuffer<f32>, sr_scalar: f32)->f32{
+        if self.end_point == -1.0{
+            self.end_point = buffer.capacity() as f32;
+        }
         if self.adsr.is_active(){
             let sample = buffer.get_frac(self.phase_offset);
-            self.phase_offset += self.phase_step * sr_scalar;
-               
-            if self.phase_offset >= buffer.capacity() as f32 {
-                self.phase_step = 0.0;
-                self.phase_offset = 0.0;
-                //self.phase_offsets[self.channel_id] -= self.buffers[0].capacity() as f32;
+            if !self.reversed{
+                self.phase_offset += self.phase_step * sr_scalar*-1.0;
+                if self.phase_offset >= self.end_point{
+                    self.phase_step = 0.0;
+                    self.phase_offset = self.start_point;
+                    return 0.0
+                    //self.phase_offsets[self.channel_id] -= self.buffers[0].capacity() as f32;
+                }
+            }else{     
+                self.phase_offset -= self.phase_step * sr_scalar;
+                if self.phase_offset <= self.end_point{
+                    self.phase_step = 0.0;
+                    self.phase_offset = self.start_point;
+                    return 0.0
+                    //self.phase_offsets[self.channel_id] -= self.buffers[0].capacity() as f32;
+                }
             }
+               
             sample * self.adsr.getNextSample()
         }else{
-            self.phase_offset = 0.0;
+            self.phase_offset = self.start_point;
             self.phase_step = 0.0;
             0.0
         }
@@ -56,16 +75,29 @@ impl SamplerVoice{
     /// 
     /// Essentially, it just reads through the given buffer
     pub fn processAssign(&mut self, buffer: &mut RingBuffer<f32>, sr_scalar: f32)->f32{
+        if self.end_point == -1.0{
+            self.end_point = buffer.capacity() as f32;
+        }
         if self.adsr.is_active(){
             let sample = buffer.get_frac(self.phase_offset);
-            self.phase_offset += 1.0 * sr_scalar;
-            if self.phase_offset >= buffer.capacity() as f32 {
-                self.phase_step = 0.0;
-                self.phase_offset = 0.0;
+            if !self.reversed{
+                self.phase_offset += 1.0 * sr_scalar;
+                if self.phase_offset >= self.end_point{
+                    self.phase_step = 0.0;
+                    self.phase_offset = self.start_point;
+                    return 0.0
+                }
+            }else{
+                self.phase_offset -= 1.0 * sr_scalar;
+                if self.phase_offset <= self.end_point{
+                    self.phase_step = 0.0;
+                    self.phase_offset = self.start_point;
+                    return 0.0
+                }
             }
             sample*self.adsr.getNextSample()
         }else{
-            self.phase_offset = 0.0;
+            self.phase_offset = self.start_point;
             0.0
         }
     }
@@ -98,6 +130,39 @@ impl SamplerVoice{
         self.adsr.set_attack(attack_);
         self.adsr.set_decay(decay_);
         self.adsr.set_release(release_);
+    }
+    /// Sets the point at which the sample begins playing back (0%-99%)
+    /// 
+    /// If the start point is greater than the endpoint, the playback will be reversed
+    pub fn set_start_point(&mut self, start_point: f32, length: usize){
+        let point = 0.01 * fclamp(start_point, 0.0, 99.0);
+        self.start_point = point * length as f32;
+        self.reversed =  self.start_point > self.end_point;
+    }
+    /// Sets the point at which the sample ends playing back (1%-100%)
+    /// 
+    /// If the end point is less than the start point, the playback will be reversed
+    pub fn set_end_point(&mut self, end_point: f32, length: usize){
+        let point = 0.01 * fclamp(end_point, 0.0, 100.0);
+        self.end_point = point * length as f32;
+        self.reversed =  self.start_point > self.end_point;
+    }
+    /// Sets the start point and end point for the sample's playback. 
+    /// 
+    /// start_point: (0%-100%),     end_point: (0%-100%)
+    /// 
+    /// If the start point is greater than the endpoint, the playback will be reversed
+    pub fn set_start_and_end_point(&mut self, start_point: f32, end_point: f32, length: usize){
+        self.set_start_point(start_point,length);
+        self.set_end_point(end_point,length);
+    }
+    /// Returns a tuple containing the start and end points (in percent) of the sampler voice
+    /// 
+    /// Returns in the format: (start_point, end_point)
+    pub fn get_points(&mut self, length: usize)-> (f32, f32){
+        let start_point = self.start_point * 100.0 / length as f32;
+        let end_point  = self.end_point * 100.0 / length as f32;
+        (start_point,end_point)
     }
     /// Returns whether or not the ADSR is active.
     /// 
