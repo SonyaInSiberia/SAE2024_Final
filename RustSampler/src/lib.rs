@@ -33,8 +33,8 @@ struct RustSamplerParams {
     pub release: FloatParam,
     #[id = "start_point"]
     pub start_point: FloatParam,
-    #[id = "length"]
-    pub length: FloatParam,
+    #[id = "end_point"]
+    pub end_point: FloatParam,
     #[id = "num_voices"]
     pub num_voices: IntParam,
 }
@@ -104,14 +104,14 @@ impl Default for RustSamplerParams {
                 FloatRange::Linear { min: 0.0, max: 100.0})
                 .with_smoother(SmoothingStyle::Linear(20.0))
                 .with_unit("%")
-                .with_step_size(0.01),
-            length: FloatParam::new(
+                .with_step_size(0.001),
+            end_point: FloatParam::new(
                 "End Point",
                 100.0, 
                 FloatRange::Linear { min: 0.0, max: 100.0 })
                 .with_smoother(SmoothingStyle::Linear(20.0))
                 .with_unit("%")
-                .with_step_size(0.01),
+                .with_step_size(0.001),
             num_voices: IntParam::new( //Max Number of Voices
                 "Voices",
                 6,
@@ -216,8 +216,11 @@ impl Plugin for RustSampler {
                 let sustain = self.params.sustain.smoothed.next();
                 let release = self.params.release.smoothed.next()*0.001;
                 let num_voices = self.params.num_voices.value();
+                let start = self.params.start_point.smoothed.next();
+                let end = self.params.end_point.smoothed.next();
                 self.engine.as_mut().unwrap().set_num_voices(num_voices as u8);
                 self.engine.as_mut().unwrap().set_adsr(attack, decay, sustain, release);
+                self.engine.as_mut().unwrap().set_points_warp(start, end);
                 *sample = self.engine.as_mut().unwrap().process();
                 *sample *= gain;
             }

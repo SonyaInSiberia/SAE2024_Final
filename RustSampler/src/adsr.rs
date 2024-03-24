@@ -28,6 +28,7 @@ enum AdsrParams{
 }
 
 impl ADSR{
+    /// Creates a new ADSR object
     pub fn new(sample_rate_: f32, attack_:f32, decay_:f32, sustain_:f32, release_:f32)->Self{
         
         let mut adsr = ADSR{
@@ -45,7 +46,8 @@ impl ADSR{
         adsr.set_adsr(attack_, decay_, sustain_, release_);
         adsr
     }
-
+    /// Gets the next sample along the ADSR graph.
+    /// Should be called for every sample
     pub fn getNextSample(&mut self)->f32{
         match self.state{
             AdsrState::Inactive => 0.0,
@@ -88,7 +90,7 @@ impl ADSR{
         }
         self.atk_step = self.get_step(1.0, self.atk_value);
     }
-
+    /// Sets decay in seconds
     pub fn set_decay(&mut self, decay_:f32){
         if decay_ < 0.0{
             self.dec_value = 0.0;
@@ -98,11 +100,11 @@ impl ADSR{
         let dist = 1.0-self.sus_value;
         self.dec_step = self.get_step(dist, self.dec_value);
     }
-
+    /// Sets sustain from 0 to 1
     pub fn set_sustain(&mut self, sustain_:f32){
         self.sus_value = fclamp(sustain_,0.0,1.0);
     }
-
+    /// Sets release in seconds
     pub fn set_release(&mut self, release_:f32){
         if release_ <= 0.0{
             self.rel_value = 0.00001;
@@ -111,27 +113,31 @@ impl ADSR{
         }
         self.rel_step = self.get_step(self.sus_value, self.rel_value);
     }
-
+    /// Sets attack, decay, sustain, and release (A,D, and R are in seconds; S: 0-1)
     pub fn set_adsr(&mut self, attack_:f32, decay_:f32, sustain_:f32, release_:f32){
         self.set_sustain(sustain_);
         self.set_attack(attack_);
         self.set_decay(decay_);
         self.set_release(release_);
     }
-
+    pub fn get_adsr(&mut self)->(f32, f32, f32, f32){
+        (self.atk_value, self.dec_value, self.sus_value, self. rel_value)
+    }
+    /// Triggers the attack stage of the ADSR
     pub fn note_on(&mut self){
         self.state = AdsrState::Attack;
     } 
-
+    /// Triggers the release stage of the ADSR
     pub fn note_off(&mut self){
         self.state = AdsrState::Release;
 
     }
-
+    /// Returns whether or not the ADSR is active (in any of the states: A, D, S, or R)
     pub fn is_active(&mut self)-> bool{
         self.state != AdsrState::Inactive
     }
-
+    /// Returns a step size to draw a line of a certain vertical 'distance' (amplitude) 
+    /// in a certain amount of time
     fn get_step(&mut self, distance: f32, time_sec: f32)->f32{
         if time_sec > 0.0 {
             distance / (time_sec*self.sample_rate)
@@ -139,7 +145,7 @@ impl ADSR{
             -1.0
         }
     }
-
+    /// Decides what state of the ADSR to go to next
     fn get_next_state(&mut self){
         match self.state{
             AdsrState::Inactive => self.state = AdsrState::Inactive,
@@ -168,6 +174,7 @@ impl ADSR{
 
 }
 
+/// Clamps floats between a min and a max value
 fn fclamp(x: f32, min_val: f32, max_val: f32) -> f32 {
     if x < min_val {
         min_val

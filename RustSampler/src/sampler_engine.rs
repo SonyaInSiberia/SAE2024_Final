@@ -7,12 +7,11 @@ use adsr::AdsrState;
 
 pub struct SamplerEngine{
     num_voices: u8,
-    sound_bank: HashMap<u8,(String,f32,RingBuffer<f32>)>,
+    sound_bank: HashMap<u8,(String,f32,RingBuffer<f32>, SamplerVoice)>,
     file_names: Vec<String>,
     warp_buffer: RingBuffer<f32>,
     sampler_mode: SamplerMode,
     warp_voices: Vec<SamplerVoice>,
-    assign_voices: Vec<SamplerVoice>,
     sample_rate: f32,
     num_channels: usize,
     warp_sr_scalar: f32,
@@ -39,13 +38,11 @@ impl SamplerEngine{
             warp_buffer: buff,
             sampler_mode: SamplerMode::Warp,
             warp_voices: voices_,
-            assign_voices: other_voices,
             sample_rate: sample_rate_,
             num_channels: num_channels_,
             warp_sr_scalar: sample_rate_,
         };
         engine.file_names.clear();
-        engine.assign_voices.clear();
         engine
     }
     pub fn process(&mut self)->f32{
@@ -58,9 +55,7 @@ impl SamplerEngine{
                 }
             },
             SamplerMode::Assign =>{
-                for voice in self.assign_voices.iter_mut(){
-                    let (file_name, sr_scalar,buff) = 
-                                                self.sound_bank.get_mut(&voice.base_midi).unwrap();
+                for (note, (name,sr_scalar,buff,voice)) in self.sound_bank.iter_mut(){
                     out_samp += voice.processAssign(buff,*sr_scalar);
                 }
             },
@@ -97,8 +92,8 @@ impl SamplerEngine{
         }
         let (buff,sr) = create_buffer(file_path);
         let sr_scalar = sr / self.sample_rate;
-        self.sound_bank.insert(note,(file_path.to_string(),sr_scalar,buff));
-        self.assign_voices.push(SamplerVoice::new(self.num_channels,note)); 
+        self.sound_bank.insert(note,(file_path.to_string(),sr_scalar,buff,
+                            SamplerVoice::new(self.num_channels,note))); 
     }
 
     /// Triggers a "note on" message and allocates a voice, 
@@ -110,13 +105,12 @@ impl SamplerEngine{
                 self.warp_voices[voice_id].note_on(note, velocity);
             },
             SamplerMode::Assign =>{
-                for voice in self.assign_voices.iter_mut(){
+                for (note_, (name,sr_scalar,buff,voice)) in self.sound_bank.iter_mut(){
                     if voice.base_midi == note{
                         voice.note_on(note, velocity);
                         break;
                     }
-                }
-                
+                } 
             },
             SamplerMode::Sfz =>{
 
@@ -135,13 +129,12 @@ impl SamplerEngine{
                 }
             },
             SamplerMode::Assign =>{
-                for voice in self.assign_voices.iter_mut(){
+                for (note_, (name,sr_scalar,buff,voice)) in self.sound_bank.iter_mut(){
                     if voice.base_midi == note{
                         voice.note_off();
                         break;
                     }
-                }
-                
+                }               
             },
             SamplerMode::Sfz =>{
 
@@ -154,7 +147,32 @@ impl SamplerEngine{
             voice.set_adsr(attack_, decay_, sustain_, release_);
         }
     }
-    /// Sets the max number of voices in the sampler
+    /// Sets the attack, decay, sustain, and release for the given assigned note
+    pub fn set_adsr_assign(&mut self, attack_: f32, decay_: f32, sustain_: f32, release_: f32, note_of_assigned: u8){
+        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+            voice.set_adsr(attack_,decay_,sustain_,release_);
+        } else {
+            // Entry does not exist, handle the error (e.g., log an error message)
+            eprintln!("Entry for note {} does not exist in sound bank", note_of_assigned);
+        }
+    }
+    /// Returns attack, decay, sustain, release values for the warping sampler
+    /// 
+    /// Returns tuple in format: (attack,decay,sustain,release)
+    pub fn get_adsr_warp(&mut self)->(f32, f32, f32, f32){
+        self.warp_voices[0].adsr.get_adsr()
+    }
+    /// Returns attack, decay, sustain, release values for the given assigned note
+    /// 
+    /// Returns tuple in format: (attack,decay,sustain,release)
+    pub fn get_adsr_assign(&mut self, note_of_assigned: u8)->(f32, f32, f32, f32){
+        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+            voice.adsr.get_adsr()
+        } else {
+            (0.1,0.1,1.0,0.1)// Returns default if note not found in map
+        }
+    }
+    /// Sets the max number of voices in the warp sampler
     pub fn set_num_voices(&mut self, num_voices: u8){
         self.warp_voices.resize(num_voices as usize, 
             SamplerVoice::new(self.num_channels,64));
@@ -167,6 +185,49 @@ impl SamplerEngine{
     pub fn set_warp_base(&mut self, base_note: u8){
         for voice in self.warp_voices.iter_mut(){
             voice.set_base_midi(base_note);
+        }
+    }
+    /// Sets the start and end points for each of the voices for the warping sampler
+    /// 
+    /// start_point: (0%-100%),     end_point: (0%-100%)
+    ///  
+    /// If the start point is greater than the endpoint, the playback will be reversed
+    pub fn set_points_warp(&mut self, start_point: f32, end_point: f32){
+        for voice in self.warp_voices.iter_mut(){
+            voice.set_start_and_end_point(start_point, end_point, self.warp_buffer.capacity());
+        }
+    }
+    /// Gets the start and end points (in percent) for the warp sampler
+    /// 
+    ///  Returns tuple in the format: (start_point, end_point)
+    pub fn get_points_warp(&mut self)->(f32,f32){
+        self.warp_voices[0].get_points(self.warp_buffer.capacity())
+    }
+    /// Sets the start and end points for an assigned sampler voice
+    /// 
+    /// 
+    /// start_point: (0%-100%),     end_point: (0%-100%), note_of_assignment: note of the 
+    ///  
+    /// If the start point is greater than the endpoint, the playback will be reversed
+    pub fn set_points_assign(&mut self, start_point: f32, end_point: f32, note_of_assigned: u8) {
+        // Attempt to retrieve the entry corresponding to the given note_of_assigned
+        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+            // Entry exists, update the points
+            voice.set_start_and_end_point(start_point, end_point, buff.capacity());
+        } else {
+            // Entry does not exist, handle the error (e.g., log an error message)
+            eprintln!("Entry for note {} does not exist in sound bank", note_of_assigned);
+        }
+    }
+    /// Gets the start and end points (in percent) of the voice assigned to the given midi note
+    /// 
+    /// Returns tuple in the format: (start_point, end_point)
+    pub fn get_points_assign(&mut self, note_of_assigned: u8)->(f32,f32){
+        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+            // Entry exists, update the points
+            voice.get_points(buff.capacity())
+        } else{
+            (0.0,100.0)// Return defaults if note not found
         }
     }
     /// Chooses a voice and steals the quietest one
