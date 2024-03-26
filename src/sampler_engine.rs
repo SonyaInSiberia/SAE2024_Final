@@ -1,9 +1,10 @@
 use crate::{sampler_voice,ring_buffer,adsr};
-use sampler_voice::SamplerVoice;
+use sampler_voice::{SamplerVoice,SustainModes,VoiceType};
 use ring_buffer::RingBuffer;
 use std::collections::HashMap;
 use hound::{WavReader, WavSpec, SampleFormat};
 use adsr::AdsrState;
+
 
 pub struct SamplerEngine{
     num_voices: u8,
@@ -28,8 +29,7 @@ impl SamplerEngine{
         
         let files = vec!["".to_string();100];
         let buff = RingBuffer::<f32>::new(1);
-        let voices_ = vec![SamplerVoice::new(num_channels_,64);6];
-        let other_voices = vec![SamplerVoice::new(num_channels_,64);1];
+        let voices_ = vec![SamplerVoice::new(num_channels_,sample_rate_,64,VoiceType::Warp);6];
 
         let mut engine = SamplerEngine{
             num_voices: 6,
@@ -50,13 +50,13 @@ impl SamplerEngine{
         match self.sampler_mode{
             SamplerMode::Warp =>{
                 for voice in self.warp_voices.iter_mut(){
-                    out_samp += voice.processWarp(&mut self.warp_buffer, 
+                    out_samp += voice.process(&mut self.warp_buffer, 
                                                 self.warp_sr_scalar);
                 }
             },
             SamplerMode::Assign =>{
                 for (note, (name,sr_scalar,buff,voice)) in self.sound_bank.iter_mut(){
-                    out_samp += voice.processAssign(buff,*sr_scalar);
+                    out_samp += voice.process(buff,*sr_scalar);
                 }
             },
             SamplerMode::Sfz =>{
@@ -93,7 +93,7 @@ impl SamplerEngine{
         let (buff,sr) = create_buffer(file_path);
         let sr_scalar = sr / self.sample_rate;
         self.sound_bank.insert(note,(file_path.to_string(),sr_scalar,buff,
-                            SamplerVoice::new(self.num_channels,note))); 
+                            SamplerVoice::new(self.num_channels,self.sample_rate,note,VoiceType::Assign))); 
     }
 
     /// Triggers a "note on" message and allocates a voice, 
@@ -142,7 +142,7 @@ impl SamplerEngine{
         }
     }
     /// Sets the attack, decay, sustain, and release for all the warp sample voices
-    pub fn set_adsr(&mut self, attack_: f32, decay_: f32, sustain_: f32, release_: f32){
+    pub fn set_adsr_warp(&mut self, attack_: f32, decay_: f32, sustain_: f32, release_: f32){
         for voice in self.warp_voices.iter_mut(){
             voice.set_adsr(attack_, decay_, sustain_, release_);
         }
@@ -175,7 +175,7 @@ impl SamplerEngine{
     /// Sets the max number of voices in the warp sampler
     pub fn set_num_voices(&mut self, num_voices: u8){
         self.warp_voices.resize(num_voices as usize, 
-            SamplerVoice::new(self.num_channels,64));
+            SamplerVoice::new(self.num_channels,self.sample_rate, 64,VoiceType::Warp));
     }
     /// Sets the sampler mode (Warp, Assign, Sfz)
     pub fn set_mode(&mut self, mode: SamplerMode){
@@ -265,15 +265,31 @@ impl SamplerEngine{
             (0.0,100.0)// Return defaults if note not found
         }
     }
-    pub fn set_sus_looping_warp(&mut self, activator: bool){
+    pub fn set_sus_looping_warp(&mut self, mode: SustainModes){
         for voice in self.warp_voices.iter_mut(){
-            voice.sus_looping = activator;
+            voice.set_sus_loop_mode(mode);
         }
     }
-    pub fn set_sus_looping_assign(&mut self, activator: bool, note_of_assigned: u8){
+    pub fn set_sus_looping_assign(&mut self, mode: SustainModes, note_of_assigned: u8){
         if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
             // Entry exists, update the points
-            voice.sus_looping = activator;
+            voice.set_sus_loop_mode(mode);
+        } else {
+            // Entry does not exist, handle the error (e.g., log an error message)
+            eprintln!("Entry for note {} does not exist in sound bank", note_of_assigned);
+        }
+    }
+    /// Sets crossfade time in seconds for the warp sampler, expects values between (0.00001 and 0.1)
+    pub fn set_fade_time_warp(&mut self, fade_time: f32){
+        for voice in self.warp_voices.iter_mut(){
+            voice.set_fade_time(fade_time);
+        }
+    }
+    /// Sets crossfade time in seconds for the selected file, expects values between (0.00001 and 0.1)
+    pub fn set_fade_time_assign(&mut self, fade_time: f32, note_of_assigned: u8){
+        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+            // Entry exists, update the points
+            voice.set_fade_time(fade_time);
         } else {
             // Entry does not exist, handle the error (e.g., log an error message)
             eprintln!("Entry for note {} does not exist in sound bank", note_of_assigned);
