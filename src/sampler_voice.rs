@@ -1,6 +1,7 @@
 use std::clone;
 
 use crate::ring_buffer;
+use nih_plug::params::enums::Enum;
 use ring_buffer::RingBuffer;
 use crate::adsr;
 use adsr::{ADSR, AdsrState};
@@ -28,7 +29,7 @@ pub struct SamplerVoice{
     sus_passed: bool,
     voice_type: VoiceType,
 }
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Enum)]
 pub enum SustainModes{
     NoLoop, // Sustain does not loop
     LoopWrap, // Sustain loop will go to the sus_end point and wrap to the sus_start point
@@ -104,6 +105,7 @@ impl SamplerVoice{
             sample * self.adsr.getNextSample()
         }else{
             self.phase_offset = self.start_point;
+            self.sus_passed = false;
             0.0
         }
     }
@@ -296,11 +298,9 @@ impl SamplerVoice{
                         self.sus_passed = true;
                     }
                     if self.phase_offset >= self.sus_end{
-                        self.phase_offset = self.sus_end;
                         self.phase_step *= -1.0;
                     }
                     if self.sus_passed && self.phase_offset <= self.sus_start{
-                        self.phase_offset = self.sus_start;
                         self.phase_step *= -1.0;
                     }
                 }else{
@@ -308,11 +308,9 @@ impl SamplerVoice{
                         self.sus_passed = true;
                     }
                     if self.phase_offset <= self.sus_start{
-                        self.phase_offset = self.sus_end;
                         self.phase_step *= -1.0;
                     }
                     if self.sus_passed && self.phase_offset >= self.sus_end{
-                        self.phase_offset = self.sus_start;
                         self.phase_step *= -1.0;
                     }
                 }
