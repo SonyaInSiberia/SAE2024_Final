@@ -1,9 +1,13 @@
 use std::clone;
 
 use crate::ring_buffer;
+use nih_plug::params::enums::Enum;
 use ring_buffer::RingBuffer;
 use crate::adsr;
 use adsr::{ADSR, AdsrState};
+use crate::crossfade;
+use crossfade::Crossfade;
+
 #[derive(Clone)]
 pub struct SamplerVoice{
     phase_offset: f32,
@@ -11,48 +15,75 @@ pub struct SamplerVoice{
     pub midi_note: u8,
     pub base_midi: u8,
     num_channels: usize,
+    sample_rate: f32,
     pub adsr: ADSR,
     pub sus_is_velo: bool,
     start_point: f32,
     end_point: f32,
     reversed: bool,
-    pub sus_looping: bool,
+    sus_mode: SustainModes,
     sus_start: f32,
     sus_end: f32,
+    crossfader: Crossfade,
+    fade_time: f32,
+    sus_passed: bool,
+    voice_type: VoiceType,
 }
+#[derive(Clone, Copy, PartialEq, Enum)]
+pub enum SustainModes{
+    NoLoop, // Sustain does not loop
+    LoopWrap, // Sustain loop will go to the sus_end point and wrap to the sus_start point
+    LoopBounce, // Sustain loop will reverse at sus_end point and playback normally at sus_start
+                // and will repeat until note_off (see sampler in ableton)
+}
+#[derive(Clone, Copy, PartialEq)]
+pub enum VoiceType{
+    Warp,
+    Assign,
+}
+
 
 impl SamplerVoice{
     /// Deals with an audio file and either plays it back at a set rate
     /// based on a midi note or plays back an assigned file
-    pub fn new(num_channesls_: usize, base_midi_: u8)->Self{
-        let adsr_ = ADSR::new(44100.0, 0.2, 0.1,0.5,0.2);
+    pub fn new(num_channesls_: usize, sample_rate_: f32, base_midi_: u8, voice_type_: VoiceType)->Self{
+        let adsr_ = ADSR::new(sample_rate_, 0.2, 0.1,0.5,0.2);
+        let fader = Crossfade::new(sample_rate_, 0.0, 0.0);
         SamplerVoice{
             phase_offset: 0.0,
             phase_step: 1.0,
             midi_note: 0,
             base_midi: base_midi_,
             num_channels: num_channesls_,
+            sample_rate: sample_rate_,
             adsr: adsr_,
             sus_is_velo: false,
             start_point: 0.0,
             end_point: -1.0,
             reversed: false,
-            sus_looping: false,
+            sus_mode: SustainModes::NoLoop,
             sus_start: -1.0,
             sus_end: -1.0,
+            crossfader: fader,
+            fade_time: 0.0002,
+            sus_passed: false,
+            voice_type: voice_type_
         }
     }
     ///Reads from the loaded sample file
     /// Uses the get_frac function in the ring_buffer, which returns the sample
     /// at a fractional index
-    pub fn processWarp(&mut self, buffer: &mut RingBuffer<f32>, sr_scalar: f32)->f32{
+    pub fn process(&mut self, buffer: &mut RingBuffer<f32>, sr_scalar: f32)->f32{
         self.check_inits(buffer.capacity());
+        let fade_samps = self.fade_time*self.sample_rate;
+        let mut cross_start = 0.0;
         if self.adsr.is_active(){
-            let sample = buffer.get_frac(self.phase_offset);
+            let mut sample = buffer.get_frac(self.phase_offset);
             if !self.reversed{
+                cross_start = self.sus_end - fade_samps;
                 self.phase_offset += self.phase_step * sr_scalar;
-                if self.sus_looping && self.adsr.state==AdsrState::Sustain && self.phase_offset >= self.sus_end{
-                    self.phase_offset = self.sus_start;
+                if self.sus_mode != SustainModes::NoLoop{
+                    self.sus_logic(&mut sample, cross_start);
                 }
                 if self.phase_offset >= self.end_point{
                     self.phase_step = 0.0;
@@ -60,9 +91,10 @@ impl SamplerVoice{
                     return 0.0
                 }
             }else{     
+                cross_start = self.sus_start + fade_samps;
                 self.phase_offset -= self.phase_step * sr_scalar;
-                if self.sus_looping && self.adsr.state==AdsrState::Sustain && self.phase_offset <= self.sus_start{
-                    self.phase_offset = self.sus_end;
+                if self.sus_mode != SustainModes::NoLoop{
+                    self.sus_logic(&mut sample, cross_start);
                 }
                 if self.phase_offset <= self.end_point{
                     self.phase_step = 0.0;
@@ -73,51 +105,22 @@ impl SamplerVoice{
             sample * self.adsr.getNextSample()
         }else{
             self.phase_offset = self.start_point;
-            self.phase_step = 0.0;
+            self.sus_passed = false;
             0.0
         }
     }
-    /// Processes the voice when the sampler is in "Assign" mode.
-    /// 
-    /// Essentially, it just reads through the given buffer
-    pub fn processAssign(&mut self, buffer: &mut RingBuffer<f32>, sr_scalar: f32)->f32{
-        self.check_inits(buffer.capacity());
-        if self.adsr.is_active(){
-            let sample = buffer.get_frac(self.phase_offset);
-            if !self.reversed{
-                self.phase_offset += 1.0 * sr_scalar;
-                if self.sus_looping && self.phase_offset >= self.sus_end{
-                    self.phase_offset = self.sus_start;
-                }
-                if self.phase_offset >= self.end_point{
-                    self.phase_step = 0.0;
-                    self.phase_offset = self.start_point;
-                    return 0.0
-                }
-            }else{
-                self.phase_offset -= 1.0 * sr_scalar;
-                if self.sus_looping && self.adsr.state==AdsrState::Sustain && self.phase_offset <= self.sus_start{
-                    self.phase_offset = self.sus_end;
-                }
-                if self.phase_offset <= self.end_point{
-                    self.phase_step = 0.0;
-                    self.phase_offset = self.start_point;
-                    return 0.0
-                }
-            }
-            sample*self.adsr.getNextSample()
-        }else{
-            self.phase_offset = self.start_point;
-            0.0
-        }
-    }
+    
     ///Sets the midi note for the output
     /// 
     /// Is in reference to the base midi note
     pub fn set_note(&mut self, note: u8){
         self.midi_note = note;
-        let offset = iclamp((note as i8 - self.base_midi as i8)as i32,-127,127);
-        self.phase_step = 2.0_f32.powf(offset as f32 / 12.0);
+        if self.voice_type == VoiceType::Warp{
+            let offset = iclamp((note as i8 - self.base_midi as i8)as i32,-127,127);
+            self.phase_step = 2.0_f32.powf(offset as f32 / 12.0);
+        }else{
+            self.phase_step = 1.0;
+        }
     }
     /// Triggers attack on ADSR and starts playback of the audio file
     pub fn note_on(&mut self, note: u8, velocity: f32){
@@ -145,7 +148,8 @@ impl SamplerVoice{
     /// 
     /// If the start point is greater than the endpoint, the playback will be reversed
     pub fn set_start_point(&mut self, start_point: f32, length: usize){
-        let point = 0.01 * fclamp(start_point, 0.0, 99.0);
+        self.check_inits(length);
+        let point = 0.01 * fclamp(start_point, 0.0, 100.0);
         self.start_point = point * length as f32;
         self.reversed =  self.start_point > self.end_point;
     }
@@ -153,6 +157,7 @@ impl SamplerVoice{
     /// 
     /// If the end point is less than the start point, the playback will be reversed
     pub fn set_end_point(&mut self, end_point: f32, length: usize){
+        self.check_inits(length);
         let point = 0.01 * fclamp(end_point, 0.0, 100.0);
         self.end_point = point * length as f32;
         self.reversed =  self.start_point > self.end_point;
@@ -172,6 +177,7 @@ impl SamplerVoice{
     /// 
     /// start_point: (0%-100%)
     pub fn set_sus_start(&mut self, start_point: f32, length: usize){
+        self.check_inits(length);
         let mut point = 0.01 * fclamp(start_point, 0.0, 100.0) * length as f32;
         if !self.reversed{
             if point < self.start_point {point = self.start_point;}
@@ -190,6 +196,7 @@ impl SamplerVoice{
     /// 
     /// end_point: (0%-100%)
     pub fn set_sus_end(&mut self, end_point: f32, length: usize){
+        self.check_inits(length);
         let mut point = 0.01 * fclamp(end_point, 0.0, 100.0) * length as f32;
         if !self.reversed{
             if point <= self.start_point {point = self.start_point+10.0;}
@@ -237,6 +244,16 @@ impl SamplerVoice{
     pub fn set_base_midi(&mut self, note: u8){
         self.base_midi = note;
     }
+    /// Sets crossfade time in seconds, expects values between (0.00001 and 0.1)
+    pub fn set_fade_time(&mut self, fade_time: f32){
+        self.fade_time = fclamp(fade_time, 0.0, 0.1);
+        self.crossfader.set_values(fade_time*0.5, fade_time*0.5);
+    }
+    /// Sets the sustain mode
+    pub fn set_sus_loop_mode(&mut self, mode: SustainModes){
+        self.sus_mode = mode;
+    }
+    /// Makes sure there are proper initial values if none have been assigned
     fn check_inits(&mut self, capacity: usize){
         if self.end_point == -1.0{
             self.end_point = capacity as f32;
@@ -248,7 +265,62 @@ impl SamplerVoice{
             self.sus_end = 0.6 * capacity as f32;
         }
     }
-
+    /// Handles the logic for the different sustain looping modes
+    fn sus_logic(&mut self, sample: &mut f32, cross_start: f32){
+        if self.adsr.state == AdsrState::Sustain{
+            if self.sus_mode == SustainModes::LoopWrap{
+                 if !self.reversed{
+                     if self.phase_offset >= cross_start && self.phase_offset <= cross_start+self.phase_step{
+                         self.crossfader.start_fade_out();
+                     }
+                     if self.phase_offset >= self.sus_end{
+                         self.phase_offset = self.sus_start;
+                         self.crossfader.start_fade_in();
+                     }
+                     if self.phase_offset >= self.sus_start{
+                         *sample *= self.crossfader.getNextSample();
+                     }
+                 } else{
+                     if self.phase_offset <= cross_start && self.phase_offset >= cross_start-self.phase_step{
+                         self.crossfader.start_fade_out();
+                     }
+                     if self.phase_offset <= self.sus_start{
+                         self.phase_offset = self.sus_end;
+                         self.crossfader.start_fade_in();
+                     }
+                     if self.phase_offset <= self.sus_end{
+                         *sample *= self.crossfader.getNextSample();
+                     }
+                 }
+            }else if self.sus_mode == SustainModes::LoopBounce {
+                if !self.reversed{
+                    if !self.sus_passed && self.phase_offset >= self.sus_start{
+                        self.sus_passed = true;
+                    }
+                    if self.phase_offset >= self.sus_end{
+                        self.phase_step *= -1.0;
+                    }
+                    if self.sus_passed && self.phase_offset <= self.sus_start{
+                        self.phase_step *= -1.0;
+                    }
+                }else{
+                    if !self.sus_passed && self.phase_offset <= self.sus_end{
+                        self.sus_passed = true;
+                    }
+                    if self.phase_offset <= self.sus_start{
+                        self.phase_step *= -1.0;
+                    }
+                    if self.sus_passed && self.phase_offset >= self.sus_end{
+                        self.phase_step *= -1.0;
+                    }
+                }
+            }
+        }else{
+            if self.phase_step < 0.0 { // makes sure increment isnt negative after sustain looping
+                self.phase_step *= -1.0;
+            }
+        }
+    }
 }
 
 

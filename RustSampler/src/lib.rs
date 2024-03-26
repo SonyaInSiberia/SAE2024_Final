@@ -4,7 +4,10 @@ mod adsr;
 mod ring_buffer;
 mod sampler_voice;
 mod sampler_engine;
+mod crossfade;
 use sampler_engine::{SamplerEngine,SamplerMode};
+use sampler_voice::SustainModes;
+
 
 // This is a shortened version of the gain example with most comments removed, check out
 // https://github.com/robbert-vdh/nih-plug/blob/master/plugins/examples/gain/src/lib.rs to get
@@ -41,8 +44,10 @@ struct RustSamplerParams {
     pub sus_start: FloatParam,
     #[id = "sus_end"]
     pub sus_end: FloatParam,
-    #[id = "sus_looping"]
-    pub sus_looping: BoolParam,
+    #[id = "sus_mode"]
+    pub sus_mode: EnumParam<SustainModes>,
+    #[id = "fade_time"]
+    pub fade_time: FloatParam,
 }
 
 impl Default for RustSampler {
@@ -137,9 +142,17 @@ impl Default for RustSamplerParams {
                 .with_smoother(SmoothingStyle::Linear(20.0))
                 .with_unit("%")
                 .with_step_size(0.001),
-            sus_looping: BoolParam::new(
-                "Sustain Looping", 
-                false),
+            sus_mode: EnumParam::new(
+                "Sustain Mode",
+                SustainModes::NoLoop,
+            ),
+            fade_time: FloatParam::new(
+                "Crossfade time",
+                0.0, 
+                FloatRange::Linear { min: 0.0, max: 500.0 })
+                .with_smoother(SmoothingStyle::Linear(20.0))
+                .with_unit("ms")
+                .with_step_size(1.0),
         }
     }
 }
@@ -243,12 +256,14 @@ impl Plugin for RustSampler {
                 let end = self.params.end_point.smoothed.next();
                 let sus_start = self.params.sus_start.smoothed.next();
                 let sus_end = self.params.sus_end.smoothed.next();
-                let sus_looping = self.params.sus_looping.value();
+                let sus_mode = self.params.sus_mode.value();
+                let fade_time = self.params.fade_time.value()*0.001;
                 self.engine.as_mut().unwrap().set_num_voices(num_voices as u8);
-                self.engine.as_mut().unwrap().set_adsr(attack, decay, sustain, release);
+                self.engine.as_mut().unwrap().set_adsr_warp(attack, decay, sustain, release);
                 self.engine.as_mut().unwrap().set_points_warp(start, end);
-                self.engine.as_mut().unwrap().set_sus_looping_warp(sus_looping);
+                self.engine.as_mut().unwrap().set_sus_looping_warp(sus_mode);
                 self.engine.as_mut().unwrap().set_sus_points_warp(sus_start, sus_end);
+                self.engine.as_mut().unwrap().set_fade_time_warp(fade_time);
                 *sample = self.engine.as_mut().unwrap().process();
                 *sample *= gain;
             }
