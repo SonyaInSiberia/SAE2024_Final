@@ -1,5 +1,5 @@
 #[derive(Clone)]
-pub struct ADSR{
+pub struct Adsr{
     atk_step: f32,
     dec_step: f32,
     rel_step: f32,
@@ -20,18 +20,11 @@ pub enum AdsrState{
     Inactive
 }
 
-enum AdsrParams{
-    Attack,
-    Decay,
-    Sustain,
-    Release,
-}
-
-impl ADSR{
+impl Adsr{
     /// Creates a new ADSR object
     pub fn new(sample_rate_: f32, attack_:f32, decay_:f32, sustain_:f32, release_:f32)->Self{
         
-        let mut adsr = ADSR{
+        let mut adsr = Adsr{
             atk_step: 0.0,
             dec_step: 0.0,
             rel_step: 0.0,
@@ -48,7 +41,7 @@ impl ADSR{
     }
     /// Gets the next sample along the ADSR graph.
     /// Should be called for every sample
-    pub fn getNextSample(&mut self)->f32{
+    pub fn get_next_sample(&mut self)->f32{
         match self.state{
             AdsrState::Inactive => 0.0,
             AdsrState::Attack => {
@@ -185,26 +178,25 @@ fn fclamp(x: f32, min_val: f32, max_val: f32) -> f32 {
     }
 }
 
-macro_rules! assert_close {
-    ($left:expr, $right:expr, $epsilon:expr) => {{
-        let (left, right, epsilon) = ($left, $right, $epsilon);
-        assert!(
-            (left - right).abs() <= epsilon,
-            "{} is not close to {} within an epsilon of {}",
-            left,
-            right,
-            epsilon
-        );
-    }};
-}
-
 
 #[cfg(test)]
 mod tests{
-    use super::*;   
+    use super::*;  
+    macro_rules! assert_close {
+        ($left:expr, $right:expr, $epsilon:expr) => {{
+            let (left, right, epsilon) = ($left, $right, $epsilon);
+            assert!(
+                (left - right).abs() <= epsilon,
+                "{} is not close to {} within an epsilon of {}",
+                left,
+                right,
+                epsilon
+            );
+        }};
+    } 
     #[test]
     fn test_functionality(){
-        let mut adsr = ADSR::new(50.0, 0.2, 0.1,0.5,0.2);
+        let mut adsr = Adsr::new(50.0, 0.2, 0.1,0.5,0.2);
         let mut signal: Vec<f32> = vec![1.0;50];
         for (i,sample) in signal.iter_mut().enumerate(){
             if i == 0{
@@ -213,7 +205,7 @@ mod tests{
             if i == 40{
                 adsr.note_off();
             }
-            *sample *= adsr.getNextSample();
+            *sample *= adsr.get_next_sample();
             if i < 10 {
                 assert_close!(*sample, i as f32*0.1 +0.1, 0.001);
             }else if i > 9 && i < 15{

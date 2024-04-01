@@ -29,7 +29,7 @@ impl Crossfade{
        fader.set_values(in_time_, out_time_);
        fader
     }
-    pub fn getNextSample(&mut self)->f32{
+    pub fn get_next_sample(&mut self)->f32{
         match self.state{
             FaderState::NoEffect => {1.0},
             FaderState::FadingIn =>{

@@ -208,7 +208,7 @@ impl Plugin for RustSampler {
         // Resize buffers and perform other potentially expensive initialization operations here.
         // The `reset()` function is always called right after this function. You can remove this
         // function if you do not need it.
-        let mut engine_ = SamplerEngine::new(_buffer_config.sample_rate, 2);
+        let engine_ = SamplerEngine::new(_buffer_config.sample_rate, 2);
         self.engine = Some(engine_);
         // Tests to see if second file will overwrite first file
         self.engine.as_mut().unwrap().load_file_from_path("/Users/davidjones/Desktop/0My_samples/808_drum_kit/808_drum_kit/classic 808/1 weird 808.wav");
