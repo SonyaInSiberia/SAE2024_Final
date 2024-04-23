@@ -1,5 +1,6 @@
 use nih_plug::prelude::*;
 use std::sync::Arc;
+use nih_plug_egui::{create_egui_editor, egui, widgets, EguiState};
 mod adsr;
 mod ring_buffer;
 mod sampler_voice;
@@ -20,6 +21,10 @@ struct RustSampler {
 
 #[derive(Params)]
 struct RustSamplerParams {
+    /// The editor state, saved together with the parameter state so the custom scaling can be
+    /// restored.
+    #[persist = "editor-state"]
+    editor_state: Arc<EguiState>,
     /// The parameter's ID is used to identify the parameter in the wrappred plugin API. As long as
     /// these IDs remain constant, you can rename and reorder these fields as you wish. The
     /// parameters are exposed to the host in the same order they were defined. In this case, this
@@ -63,6 +68,7 @@ impl Default for RustSampler {
 impl Default for RustSamplerParams {
     fn default() -> Self {
         Self {
+            editor_state: EguiState::from_size(300, 180),
             // This gain is stored as linear gain. NIH-plug comes with useful conversion functions
             // to treat these kinds of parameters as if we were dealing with decibels. Storing this
             // as decibels is easier to work with, but requires a conversion for every sample.
@@ -197,6 +203,26 @@ impl Plugin for RustSampler {
 
     fn params(&self) -> Arc<dyn Params> {
         self.params.clone()
+    }
+
+    fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
+        let params = self.params.clone();
+        create_egui_editor(
+            self.params.editor_state.clone(),
+            (),
+            |_, _| {},
+            move |egui_ctx, setter, _state| {
+                egui::CentralPanel::default().show(egui_ctx, |ui| {
+                    // NOTE: See `plugins/diopser/src/editor.rs` for an example using the generic UI widget
+
+                    // This is a fancy widget that can get all the information it needs to properly
+                    // display and modify the parameter from the parametr itself
+                    // It's not yet fully implemented, as the text is missing.
+                    ui.label("Some random integer");
+                    egui_ctx
+                });
+            },
+        )
     }
 
     fn initialize(
