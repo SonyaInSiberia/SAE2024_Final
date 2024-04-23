@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 #[derive(Clone)]
 pub struct RingBuffer<T> {
     // TODO: fill this in.
@@ -124,7 +123,7 @@ impl RingBuffer<f32>{
             1
         };
         let mut read_int = self.write_ptr as i32 - offset.ceil() as i32 - fract_ptr_offset;
-        let mut read_point = 0;
+        let mut read_point;
         if read_int < 0 {
             read_int += self.capacity() as i32;
             read_point = read_int as usize;

@@ -2,7 +2,7 @@ use crate::{sampler_voice,ring_buffer,adsr};
 use sampler_voice::{SamplerVoice,SustainModes,VoiceType};
 use ring_buffer::RingBuffer;
 use std::collections::HashMap;
-use hound::{WavReader, WavSpec, SampleFormat};
+use hound::SampleFormat;
 use adsr::AdsrState;
 
 
@@ -55,7 +55,7 @@ impl SamplerEngine{
                 }
             },
             SamplerMode::Assign =>{
-                for (note, (name,sr_scalar,buff,voice)) in self.sound_bank.iter_mut(){
+                for (_note, (_name,sr_scalar,buff,voice)) in self.sound_bank.iter_mut(){
                     out_samp += voice.process(buff,*sr_scalar);
                 }
             },
@@ -105,7 +105,7 @@ impl SamplerEngine{
                 self.warp_voices[voice_id].note_on(note, velocity);
             },
             SamplerMode::Assign =>{
-                for (note_, (name,sr_scalar,buff,voice)) in self.sound_bank.iter_mut(){
+                for (_note_, (_name,_sr_scalar,_buff,voice)) in self.sound_bank.iter_mut(){
                     if voice.base_midi == note{
                         voice.note_on(note, velocity);
                         break;
@@ -129,7 +129,7 @@ impl SamplerEngine{
                 }
             },
             SamplerMode::Assign =>{
-                for (note_, (name,sr_scalar,buff,voice)) in self.sound_bank.iter_mut(){
+                for (_note, (_name,_sr_scalar,_buff,voice)) in self.sound_bank.iter_mut(){
                     if voice.base_midi == note{
                         voice.note_off();
                         break;
@@ -149,7 +149,7 @@ impl SamplerEngine{
     }
     /// Sets the attack, decay, sustain, and release for the given assigned note
     pub fn set_adsr_assign(&mut self, attack_: f32, decay_: f32, sustain_: f32, release_: f32, note_of_assigned: u8){
-        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+        if let Some((_file_name, _sr_scalar, _buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
             voice.set_adsr(attack_,decay_,sustain_,release_);
         } else {
             // Entry does not exist, handle the error (e.g., log an error message)
@@ -166,16 +166,26 @@ impl SamplerEngine{
     /// 
     /// Returns tuple in format: (attack,decay,sustain,release)
     pub fn get_adsr_assign(&mut self, note_of_assigned: u8)->(f32, f32, f32, f32){
-        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+        if let Some((_file_name, _sr_scalar, _buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
             voice.adsr.get_adsr()
         } else {
             (0.1,0.1,1.0,0.1)// Returns default if note not found in map
         }
     }
     /// Sets the max number of voices in the warp sampler
-    pub fn set_num_voices(&mut self, num_voices: u8){
+    pub fn set_num_voices(&mut self, mut num_voices: u8){
+        if num_voices < 1{
+            num_voices = 1;
+        }else if num_voices > 24{
+            num_voices = 24;
+        }
+        self.num_voices = num_voices;
         self.warp_voices.resize(num_voices as usize, 
             SamplerVoice::new(self.num_channels,self.sample_rate, 64,VoiceType::Warp));
+    }
+    /// Returns the number of voices available for the warping sampler
+    pub fn get_num_voices(&mut self)->u8{
+        self.num_voices
     }
     /// Sets the sampler mode (Warp, Assign, Sfz)
     pub fn set_mode(&mut self, mode: SamplerMode){
@@ -211,7 +221,7 @@ impl SamplerEngine{
     /// If the start point is greater than the endpoint, the playback will be reversed
     pub fn set_points_assign(&mut self, start_point: f32, end_point: f32, note_of_assigned: u8) {
         // Attempt to retrieve the entry corresponding to the given note_of_assigned
-        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+        if let Some((_file_name, _sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
             // Entry exists, update the points
             voice.set_start_and_end_point(start_point, end_point, buff.capacity());
         } else {
@@ -223,7 +233,7 @@ impl SamplerEngine{
     /// 
     /// Returns tuple in the format: (start_point, end_point)
     pub fn get_points_assign(&mut self, note_of_assigned: u8)->(f32,f32){
-        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+        if let Some((_file_name, _sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
             // Entry exists, update the points
             voice.get_points(buff.capacity())
         } else{
@@ -246,7 +256,7 @@ impl SamplerEngine{
     /// Sets the start and end points of the assigned buffer's sustain looping. Values will be clamped
     /// within start and end points of the sample as a whole
     pub fn set_sus_points_assign(&mut self, start_point: f32, end_point: f32, note_of_assigned: u8){
-        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+        if let Some((_file_name, _sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
             // Entry exists, update the points
             voice.set_sus_points(start_point, end_point, buff.capacity());
         } else {
@@ -258,7 +268,7 @@ impl SamplerEngine{
     /// 
     /// Returns tuple in the format: (start_point, end_point)
     pub fn get_sus_points_assign(&mut self, note_of_assigned: u8)->(f32,f32){
-        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+        if let Some((_file_name, _sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
             // Entry exists, update the points
             voice.get_sus_points(buff.capacity())
         } else{
@@ -271,7 +281,7 @@ impl SamplerEngine{
         }
     }
     pub fn set_sus_looping_assign(&mut self, mode: SustainModes, note_of_assigned: u8){
-        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+        if let Some((_file_name, _sr_scalar, _buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
             // Entry exists, update the points
             voice.set_sus_loop_mode(mode);
         } else {
@@ -287,7 +297,7 @@ impl SamplerEngine{
     }
     /// Sets crossfade time in seconds for the selected file, expects values between (0.00001 and 0.1)
     pub fn set_fade_time_assign(&mut self, fade_time: f32, note_of_assigned: u8){
-        if let Some((file_name, sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+        if let Some((_file_name, _sr_scalar, _buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
             // Entry exists, update the points
             voice.set_fade_time(fade_time);
         } else {
@@ -338,7 +348,6 @@ impl SamplerEngine{
 fn fill_warp_buffer(buffer: &mut RingBuffer<f32>, path: &str) ->f32{
     let mut reader = hound::WavReader::open(path).unwrap();
     let sample_format = reader.spec().sample_format;
-    let num_channels = reader.spec().channels as usize;
     let sample_rate = reader.spec().sample_rate as f32;
     let length = reader.len();
     buffer.resize(length as usize, 0.0);

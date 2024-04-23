@@ -9,6 +9,8 @@ use std::io::BufReader;
 use std::fs::File;
 use sampler_voice::SustainModes;
 use sampler_engine::SamplerEngine;
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
@@ -44,6 +46,32 @@ fn main() {
     engine.set_sus_points_warp(14.0, 16.0);
 
     let mut writer = hound::WavWriter::create(&args[4], newSpec).unwrap();
+
+    let host = cpal::default_host();
+    let device = host
+        .default_input_device()
+        .expect("failed to find default input device");
+    let config = device.default_input_config().unwrap();
+    let sample_rate = config.sample_rate().0 as f32;
+    let channels = config.channels() as usize;
+    let buffer_size: usize = 512;
+
+    // Create a ring buffer to hold audio samples
+    let ring_buffer = RingBuffer::<f32>::new(buffer_size * channels);
+    let err_fn = move |err| {
+        eprintln!("an error occurred on stream: {}", err);
+    };
+    let stream = device.build_input_stream(
+        &config.into(),
+        move |data, _: &_| input_callback(data),
+        err_fn,
+        None,
+    ).unwrap();
+    stream.play().unwrap();
+    /* loop{
+        
+    } */
+
     for i in (0..480000){
         let mut outSample = 0.0;
         /* if i == 1000{
@@ -79,3 +107,8 @@ fn main() {
     println!("This is your sample... but with chords now!!");
 }
 
+fn input_callback(input: &[f32]){
+    for &sample in input.iter(){
+
+    }
+}
