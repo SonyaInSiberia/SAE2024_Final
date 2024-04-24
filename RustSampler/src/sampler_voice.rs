@@ -28,6 +28,7 @@ pub struct SamplerVoice{
     fade_time: f32,
     sus_passed: bool,
     voice_type: VoiceType,
+    pub internal_buffer: RingBuffer<f32>
 }
 #[derive(Clone, Copy, PartialEq, Enum)]
 pub enum SustainModes{
@@ -67,7 +68,8 @@ impl SamplerVoice{
             crossfader: fader,
             fade_time: 0.0002,
             sus_passed: false,
-            voice_type: voice_type_
+            voice_type: voice_type_,
+            internal_buffer: RingBuffer::<f32>::new(1)
         }
     }
     ///Reads from the loaded sample file
@@ -109,7 +111,42 @@ impl SamplerVoice{
             0.0
         }
     }
-    
+    pub fn process_sfz(&mut self, sr_scalar:f32)->f32{
+        self.check_inits(self.internal_buffer.capacity());
+        let fade_samps = self.fade_time*self.sample_rate;
+        let cross_start;
+        if self.adsr.is_active(){
+            let mut sample = self.internal_buffer.get_frac(self.phase_offset);
+            if !self.reversed{
+                cross_start = self.sus_end - fade_samps;
+                self.phase_offset += self.phase_step * sr_scalar;
+                if self.sus_mode != SustainModes::NoLoop{
+                    self.sus_logic(&mut sample, cross_start);
+                }
+                if self.phase_offset >= self.end_point{
+                    self.phase_step = 0.0;
+                    self.phase_offset = self.start_point;
+                    return 0.0
+                }
+            }else{     
+                cross_start = self.sus_start + fade_samps;
+                self.phase_offset -= self.phase_step * sr_scalar;
+                if self.sus_mode != SustainModes::NoLoop{
+                    self.sus_logic(&mut sample, cross_start);
+                }
+                if self.phase_offset <= self.end_point{
+                    self.phase_step = 0.0;
+                    self.phase_offset = self.start_point;
+                    return 0.0
+                }
+            }
+            sample * self.adsr.get_next_sample()
+        }else{
+            self.phase_offset = self.start_point;
+            self.sus_passed = false;
+            0.0
+        }
+    }
     ///Sets the midi note for the output
     /// 
     /// Is in reference to the base midi note

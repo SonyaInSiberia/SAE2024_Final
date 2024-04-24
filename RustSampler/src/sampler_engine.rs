@@ -72,8 +72,7 @@ impl SamplerEngine{
             },
             SamplerMode::Sfz =>{
                 for voice in self.warp_voices.iter_mut(){
-                    out_samp += voice.process(&mut self.warp_buffer, 
-                                                self.warp_sr_scalar);
+                    out_samp += voice.process_sfz(self.warp_sr_scalar);
                 }
             }
         }
@@ -189,7 +188,10 @@ impl SamplerEngine{
                                     Opcode::sample(value) => {
                                         match value.to_str() {
                                             Some(file_path) => {
-                                                self.warp_sr_scalar =  fill_warp_buffer(&mut self.warp_buffer, file_path)/self.sample_rate;
+                                                let voice_id = self.get_voice_id();
+                                                let result = create_buffer(file_path);
+                                                self.warp_sr_scalar = result.1/self.sample_rate;
+                                                self.warp_voices[voice_id].internal_buffer = result.0;
                                             },
                                             None => { panic!("Could not convert value to string") }
                                         }
