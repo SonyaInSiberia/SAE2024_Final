@@ -241,6 +241,7 @@ impl Plugin for RustSampler {
         self.engine.as_mut().unwrap().add_to_paths_and_load("/Users/davidjones/Desktop/0My_samples/Cymatics - Fantasy Synth Sample Pack/One Shots/Cymatics - Fantasy - Juno 106 BASS Rubber - C.wav");
         self.engine.as_mut().unwrap().set_mode(SamplerMode::Warp);
         self.engine.as_mut().unwrap().set_warp_base(64);
+        self.engine.as_mut().unwrap().set_warp_base(60);
         true
     }
 

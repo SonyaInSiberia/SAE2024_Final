@@ -1,9 +1,10 @@
 use crate::{sampler_voice,ring_buffer,adsr};
 use sampler_voice::{SamplerVoice,SustainModes,VoiceType};
 use ring_buffer::RingBuffer;
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 use hound::SampleFormat;
 use adsr::AdsrState;
+use sofiza::{Instrument, Opcode};
 
 
 pub struct SamplerEngine{
@@ -16,6 +17,7 @@ pub struct SamplerEngine{
     sample_rate: f32,
     num_channels: usize,
     warp_sr_scalar: f32,
+    instrument: Instrument
 }
 #[derive(PartialEq)]
 pub enum SamplerMode{
@@ -41,6 +43,7 @@ impl SamplerEngine{
             sample_rate: sample_rate_,
             num_channels: num_channels_,
             warp_sr_scalar: sample_rate_,
+            instrument: Instrument::new()
         };
         engine.file_names.clear();
         engine
@@ -96,6 +99,15 @@ impl SamplerEngine{
                             SamplerVoice::new(self.num_channels,self.sample_rate,note,VoiceType::Assign))); 
     }
 
+    /// Load an SFZ file and create an instrument
+    pub fn load_sfz(&mut self, file_path: &str){
+        let result = Instrument::from_file(Path::new(file_path));
+        match result {
+            Ok(instrument) => self.instrument = instrument,
+            Err(_e) => {}
+        }
+    }
+
     /// Triggers a "note on" message and allocates a voice, 
     ///  stealing if necessary
     pub fn note_on(&mut self, note: u8, velocity: f32){
@@ -113,7 +125,21 @@ impl SamplerEngine{
                 } 
             },
             SamplerMode::Sfz =>{
-
+                let instrument = self.instrument.clone();
+                for region in instrument.regions.iter(){
+                    let opcode_values = ["sample"];
+                    for value in opcode_values{
+                        match region.opcodes.get("sample") {
+                            Some(value) => {
+                                match value {
+                                    Opcode::sample(value) => {dbg!(value);},
+                                    _ => println!("Something else")
+                                }
+                            },
+                            None => {}
+                        }
+                    }
+                }
             }
         }
     }
