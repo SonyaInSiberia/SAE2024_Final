@@ -326,7 +326,7 @@ impl SamplerEngine{
             match self.sampler_mode {
                 SamplerMode::Warp => {voice.set_start_and_end_point(start_point, end_point, self.warp_buffer.capacity());},
                 SamplerMode::Assign => {},
-                SamplerMode::Sfz => {}
+                SamplerMode::Sfz => {voice.set_start_and_end_point(start_point, end_point, voice.internal_buffer.capacity());}
             }
         }
     }
@@ -374,7 +374,7 @@ impl SamplerEngine{
             match self.sampler_mode {
                 SamplerMode::Warp => {voice.set_sus_points(start_point, end_point, self.warp_buffer.capacity());},
                 SamplerMode::Assign => {},
-                SamplerMode::Sfz => {}
+                SamplerMode::Sfz => {voice.set_sus_points(start_point, end_point, voice.internal_buffer.capacity());}
             }
         }
     }
