@@ -17,11 +17,7 @@ pub struct SamplerEngine{
     sample_rate: f32,
     num_channels: usize,
     warp_sr_scalar: f32,
-    instrument: Instrument,
-    lokey: u8,
-    hikey: u8,
-    lovel: f32,
-    hivel: f32
+    instrument: Instrument
 }
 #[derive(PartialEq)]
 pub enum SamplerMode{
@@ -47,11 +43,7 @@ impl SamplerEngine{
             sample_rate: sample_rate_,
             num_channels: num_channels_,
             warp_sr_scalar: sample_rate_,
-            instrument: Instrument::new(),
-            lokey: u8::MIN,
-            hikey: u8::MAX,
-            lovel: f32::MIN,
-            hivel: f32::MAX
+            instrument: Instrument::new()
         };
         engine.file_names.clear();
         engine
@@ -136,11 +128,15 @@ impl SamplerEngine{
             SamplerMode::Sfz =>{
                 let instrument = self.instrument.clone();
                 for region in instrument.regions.iter(){
+                    let mut lokey = u8::MIN;
+                    let mut hikey = u8::MAX;
+                    let mut lovel = f32::MIN;
+                    let mut hivel = f32::MAX;
                     match region.opcodes.get("lokey") {
                         Some(value) => {
                             match value {
                                 Opcode::lokey(value) => {
-                                    self.lokey = *value;
+                                    lokey = *value;
                                 },
                                 _ => println!("Something else")
                             }
@@ -151,7 +147,7 @@ impl SamplerEngine{
                         Some(value) => {
                             match value {
                                 Opcode::hikey(value) => {
-                                    self.hikey = *value;
+                                    hikey = *value;
                                 },
                                 _ => println!("Something else")
                             }
@@ -162,7 +158,7 @@ impl SamplerEngine{
                         Some(value) => {
                             match value {
                                 Opcode::lovel(value) => {
-                                    self.lovel = *value as f32;
+                                    lovel = *value as f32;
                                 },
                                 _ => println!("Something else")
                             }
@@ -173,7 +169,7 @@ impl SamplerEngine{
                         Some(value) => {
                             match value {
                                 Opcode::hivel(value) => {
-                                    self.hivel = *value as f32;
+                                    hivel = *value as f32;
                                 },
                                 _ => println!("Something else")
                             }
@@ -181,17 +177,17 @@ impl SamplerEngine{
                         None => {}
                     }
                     // Conditional filters
-                    if note >= self.lokey && note <= self.hikey && velocity*127.0 >= self.lovel && velocity*127.0 <= self.hivel {
+                    if note >= lokey && note <= hikey && velocity*127.0 >= lovel && velocity*127.0 <= hivel {
+                        let voice_id = self.get_voice_id();
                         match region.opcodes.get("sample") {
                             Some(value) => {
                                 match value {
                                     Opcode::sample(value) => {
                                         match value.to_str() {
                                             Some(file_path) => {
-                                                let voice_id = self.get_voice_id();
                                                 let result = create_buffer(file_path);
                                                 self.warp_sr_scalar = result.1/self.sample_rate;
-                                                self.warp_voices[voice_id].internal_buffer = result.0;
+                                                self.warp_voices[voice_id].internal_buffer = result.0.clone();
                                             },
                                             None => { panic!("Could not convert value to string") }
                                         }
@@ -205,14 +201,13 @@ impl SamplerEngine{
                             Some(value) => {
                                 match value {
                                     Opcode::pitch_keycenter(value) => {
-                                        self.set_warp_base(*value)
+                                        self.warp_voices[voice_id].base_midi = *value;
                                     },
                                     _ => println!("Something else")
                                 }
                             },
                             None => {}
                         }
-                        let voice_id = self.get_voice_id();
                         self.warp_voices[voice_id].note_on(note, velocity);
                     }
                 }
@@ -301,7 +296,11 @@ impl SamplerEngine{
     /// Sets the note for the warping to be based on
     pub fn set_warp_base(&mut self, base_note: u8){
         for voice in self.warp_voices.iter_mut(){
-            voice.set_base_midi(base_note);
+            match self.sampler_mode {
+                SamplerMode::Warp => {voice.set_base_midi(base_note);},
+                SamplerMode::Assign => {},
+                SamplerMode::Sfz => {}
+            }
         }
     }
     /// Returns the internal buffer for the warping sampler for use in the gui
@@ -324,14 +323,22 @@ impl SamplerEngine{
     /// If the start point is greater than the endpoint, the playback will be reversed
     pub fn set_points_warp(&mut self, start_point: f32, end_point: f32){
         for voice in self.warp_voices.iter_mut(){
-            voice.set_start_and_end_point(start_point, end_point, self.warp_buffer.capacity());
+            match self.sampler_mode {
+                SamplerMode::Warp => {voice.set_start_and_end_point(start_point, end_point, self.warp_buffer.capacity());},
+                SamplerMode::Assign => {},
+                SamplerMode::Sfz => {}
+            }
         }
     }
     /// Gets the start and end points (in percent) for the warp sampler
     /// 
     ///  Returns tuple in the format: (start_point, end_point)
     pub fn get_points_warp(&mut self)->(f32,f32){
-        self.warp_voices[0].get_points(self.warp_buffer.capacity())
+        match self.sampler_mode {
+            SamplerMode::Warp => {self.warp_voices[0].get_points(self.warp_buffer.capacity())},
+            SamplerMode::Assign => {(0.0,0.0)},
+            SamplerMode::Sfz => {(0.0,0.0)}
+        }
     }
     /// Sets the start and end points for an assigned sampler voice
     /// 
@@ -364,14 +371,22 @@ impl SamplerEngine{
     /// within start and end points of the sample as a whole
     pub fn set_sus_points_warp(&mut self, start_point: f32, end_point: f32){
         for voice in self.warp_voices.iter_mut(){
-            voice.set_sus_points(start_point, end_point, self.warp_buffer.capacity());
+            match self.sampler_mode {
+                SamplerMode::Warp => {voice.set_sus_points(start_point, end_point, self.warp_buffer.capacity());},
+                SamplerMode::Assign => {},
+                SamplerMode::Sfz => {}
+            }
         }
     }
     /// Gets the start and end points for the sustain loop of the warp sampler.
     /// 
     /// Returns tuple in the format: (start_point, end_point)
     pub fn get_sus_points_warp(&mut self)->(f32,f32){
-        self.warp_voices[0].get_sus_points(self.warp_buffer.capacity())
+        match self.sampler_mode {
+            SamplerMode::Warp => {self.warp_voices[0].get_sus_points(self.warp_buffer.capacity())},
+            SamplerMode::Assign => {(0.0,0.0)},
+            SamplerMode::Sfz => {(0.0,0.0)}
+        }
     }
     /// Sets the start and end points of the assigned buffer's sustain looping. Values will be clamped
     /// within start and end points of the sample as a whole
