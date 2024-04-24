@@ -17,7 +17,11 @@ pub struct SamplerEngine{
     sample_rate: f32,
     num_channels: usize,
     warp_sr_scalar: f32,
-    instrument: Instrument
+    instrument: Instrument,
+    lokey: u8,
+    hikey: u8,
+    lovel: f32,
+    hivel: f32
 }
 #[derive(PartialEq)]
 pub enum SamplerMode{
@@ -43,7 +47,11 @@ impl SamplerEngine{
             sample_rate: sample_rate_,
             num_channels: num_channels_,
             warp_sr_scalar: sample_rate_,
-            instrument: Instrument::new()
+            instrument: Instrument::new(),
+            lokey: u8::MIN,
+            hikey: u8::MAX,
+            lovel: f32::MIN,
+            hivel: f32::MAX
         };
         engine.file_names.clear();
         engine
@@ -129,36 +137,83 @@ impl SamplerEngine{
             SamplerMode::Sfz =>{
                 let instrument = self.instrument.clone();
                 for region in instrument.regions.iter(){
-                    match region.opcodes.get("sample") {
+                    match region.opcodes.get("lokey") {
                         Some(value) => {
                             match value {
-                                Opcode::sample(value) => {
-                                    match value.to_str() {
-                                        Some(file_path) => {
-                                            self.warp_sr_scalar =  fill_warp_buffer(&mut self.warp_buffer, file_path)/self.sample_rate;
-                                        },
-                                        None => { panic!("Could not convert value to string") }
-                                    }
+                                Opcode::lokey(value) => {
+                                    self.lokey = *value;
                                 },
                                 _ => println!("Something else")
                             }
                         },
                         None => {}
                     }
-                    match region.opcodes.get("pitch_keycenter") {
+                    match region.opcodes.get("hikey") {
                         Some(value) => {
                             match value {
-                                Opcode::pitch_keycenter(value) => {
-                                    self.set_warp_base(*value)
+                                Opcode::hikey(value) => {
+                                    self.hikey = *value;
                                 },
                                 _ => println!("Something else")
                             }
                         },
                         None => {}
+                    }
+                    match region.opcodes.get("lovel") {
+                        Some(value) => {
+                            match value {
+                                Opcode::lovel(value) => {
+                                    self.lovel = *value as f32;
+                                },
+                                _ => println!("Something else")
+                            }
+                        },
+                        None => {}
+                    }
+                    match region.opcodes.get("hivel") {
+                        Some(value) => {
+                            match value {
+                                Opcode::hivel(value) => {
+                                    self.hivel = *value as f32;
+                                },
+                                _ => println!("Something else")
+                            }
+                        },
+                        None => {}
+                    }
+                    // Conditional filters
+                    if note >= self.lokey && note <= self.hikey && velocity*127.0 >= self.lovel && velocity*127.0 <= self.hivel {
+                        match region.opcodes.get("sample") {
+                            Some(value) => {
+                                match value {
+                                    Opcode::sample(value) => {
+                                        match value.to_str() {
+                                            Some(file_path) => {
+                                                self.warp_sr_scalar =  fill_warp_buffer(&mut self.warp_buffer, file_path)/self.sample_rate;
+                                            },
+                                            None => { panic!("Could not convert value to string") }
+                                        }
+                                    },
+                                    _ => println!("Something else")
+                                }
+                            },
+                            None => {}
+                        }
+                        match region.opcodes.get("pitch_keycenter") {
+                            Some(value) => {
+                                match value {
+                                    Opcode::pitch_keycenter(value) => {
+                                        self.set_warp_base(*value)
+                                    },
+                                    _ => println!("Something else")
+                                }
+                            },
+                            None => {}
+                        }
+                        let voice_id = self.get_voice_id();
+                        self.warp_voices[voice_id].note_on(note, velocity);
                     }
                 }
-                let voice_id = self.get_voice_id();
-                self.warp_voices[voice_id].note_on(note, velocity);
             }
         }
     }
