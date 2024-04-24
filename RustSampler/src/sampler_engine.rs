@@ -145,6 +145,17 @@ impl SamplerEngine{
                         },
                         None => {}
                     }
+                    match region.opcodes.get("pitch_keycenter") {
+                        Some(value) => {
+                            match value {
+                                Opcode::pitch_keycenter(value) => {
+                                    self.set_warp_base(*value)
+                                },
+                                _ => println!("Something else")
+                            }
+                        },
+                        None => {}
+                    }
                 }
                 let voice_id = self.get_voice_id();
                 self.warp_voices[voice_id].note_on(note, velocity);
