@@ -1,6 +1,14 @@
 # SAE2024_Final
 
+
 ## Next Steps
+
+* After installing Rust, you can compile Ase Example as follows:
+
+* cargo xtask bundle RustSampler --release
+
+* In the initialize method, somewhere around line 240 change the file directory of your samples, otherwise it will panic. 
+
 
 * [ ] Voice sampler fix/debug (maybe have another)
   * Preset loading:
