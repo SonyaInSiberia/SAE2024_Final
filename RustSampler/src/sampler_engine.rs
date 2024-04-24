@@ -223,6 +223,19 @@ impl SamplerEngine{
             voice.set_base_midi(base_note);
         }
     }
+    /// Returns the internal buffer for the warping sampler for use in the gui
+    pub fn get_warp_buffer(& self)-> RingBuffer<f32>{
+        self.warp_buffer.clone()
+    }
+    /// Returns the buffer for the sample assigned to the given note
+    pub fn get_assign_buffer(&mut self, note_of_assigned: u8 )->RingBuffer<f32>{
+        if let Some((_file_name, _sr_scalar, buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
+            // Entry exists, update the points
+            buff.clone()
+        } else {
+            RingBuffer::<f32>::new(1)
+        }
+    }
     /// Sets the start and end points for each of the voices for the warping sampler
     /// 
     /// start_point: (0%-100%),     end_point: (0%-100%)
@@ -301,11 +314,13 @@ impl SamplerEngine{
             (0.0,100.0)// Return defaults if note not found
         }
     }
+    /// Sets the sustain looping mode for the warping sampler
     pub fn set_sus_looping_warp(&mut self, mode: SustainModes){
         for voice in self.warp_voices.iter_mut(){
             voice.set_sus_loop_mode(mode);
         }
     }
+    /// Sets the sustain looping mode for the assign sampler
     pub fn set_sus_looping_assign(&mut self, mode: SustainModes, note_of_assigned: u8){
         if let Some((_file_name, _sr_scalar, _buff, voice)) = self.sound_bank.get_mut(&note_of_assigned) {
             // Entry exists, update the points
