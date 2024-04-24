@@ -63,8 +63,10 @@ impl SamplerEngine{
                 }
             },
             SamplerMode::Sfz =>{
-                todo!("Actually implent this lol !");
-                out_samp = 0.0;
+                for voice in self.warp_voices.iter_mut(){
+                    out_samp += voice.process(&mut self.warp_buffer, 
+                                                self.warp_sr_scalar);
+                }
             }
         }
         out_samp
@@ -127,19 +129,25 @@ impl SamplerEngine{
             SamplerMode::Sfz =>{
                 let instrument = self.instrument.clone();
                 for region in instrument.regions.iter(){
-                    let opcode_values = ["sample"];
-                    for value in opcode_values{
-                        match region.opcodes.get("sample") {
-                            Some(value) => {
-                                match value {
-                                    Opcode::sample(value) => {dbg!(value);},
-                                    _ => println!("Something else")
-                                }
-                            },
-                            None => {}
-                        }
+                    match region.opcodes.get("sample") {
+                        Some(value) => {
+                            match value {
+                                Opcode::sample(value) => {
+                                    match value.to_str() {
+                                        Some(file_path) => {
+                                            self.warp_sr_scalar =  fill_warp_buffer(&mut self.warp_buffer, file_path)/self.sample_rate;
+                                        },
+                                        None => { panic!("Could not convert value to string") }
+                                    }
+                                },
+                                _ => println!("Something else")
+                            }
+                        },
+                        None => {}
                     }
                 }
+                let voice_id = self.get_voice_id();
+                self.warp_voices[voice_id].note_on(note, velocity);
             }
         }
     }
@@ -163,7 +171,12 @@ impl SamplerEngine{
                 }               
             },
             SamplerMode::Sfz =>{
-
+                for voice in self.warp_voices.iter_mut(){
+                    if voice.midi_note == note{
+                        voice.note_off();
+                        break;
+                    }
+                }
             }
         }
     }
