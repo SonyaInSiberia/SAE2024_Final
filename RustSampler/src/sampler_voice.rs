@@ -1,5 +1,5 @@
 use std::clone;
-
+use std::fmt;
 use crate::ring_buffer;
 use nih_plug::params::enums::Enum;
 use ring_buffer::RingBuffer;
@@ -30,12 +30,16 @@ pub struct SamplerVoice{
     voice_type: VoiceType,
     pub internal_buffer: RingBuffer<f32>
 }
-#[derive(Clone, Copy, PartialEq, Enum)]
-pub enum SustainModes{
-    NoLoop, // Sustain does not loop
-    LoopWrap, // Sustain loop will go to the sus_end point and wrap to the sus_start point
-    LoopBounce, // Sustain loop will reverse at sus_end point and playback normally at sus_start
-                // and will repeat until note_off (see sampler in ableton)
+#[derive(Clone, Copy, PartialEq, Enum, Debug)]
+pub enum SustainModes {
+    NoLoop,
+    LoopWrap,
+    LoopBounce,
+}
+impl SustainModes {
+    pub fn iter() -> impl Iterator<Item = Self> {
+        [SustainModes::NoLoop, SustainModes::LoopWrap, SustainModes::LoopBounce].iter().copied()
+    }
 }
 #[derive(Clone, Copy, PartialEq)]
 pub enum VoiceType{
