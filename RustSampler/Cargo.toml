@@ -23,7 +23,9 @@ nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug.git" }
 # nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", default_features = false, features = ["assert_process_allocs"] }
 hound = "3.5.1"
 sofiza = "0.3.1"
-image = "0.24.3" 
+image = "0.25.1"
+homedir = "0.2.1"
+egui_file = { path = "egui_file-main" }
 
 [profile.release]
 lto = "thin"

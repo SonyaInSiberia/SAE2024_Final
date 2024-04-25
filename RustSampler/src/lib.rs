@@ -1,5 +1,7 @@
+use egui_file::FileDialog;
+use homedir::get_my_home;
 use nih_plug::prelude::*;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::{Arc, Mutex}};
 use nih_plug_egui::{create_egui_editor, egui, widgets, EguiState};
 mod adsr;
 mod ring_buffer;
@@ -26,6 +28,8 @@ use std::fs;
 
 struct RustSampler {
     params: Arc<RustSamplerParams>,
+    backdrop_image_path: Arc<Option<PathBuf>>,
+    open_file_dialog: Arc<Mutex<FileDialog>>,
     engine: Option<SamplerEngine>,
 }
 
@@ -70,7 +74,8 @@ impl Default for RustSampler {
         Self {
             params: Arc::new(RustSamplerParams::default()),
             engine: None,
-
+            backdrop_image_path: Arc::new(Option::None),
+            open_file_dialog: Arc::new(Mutex::new(FileDialog::open_file(get_my_home().unwrap())))
         }
     }
 }
@@ -223,6 +228,7 @@ impl Plugin for RustSampler {
     
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let params = self.params.clone();
+        let file_dialog = self.open_file_dialog.clone();
         create_egui_editor(
             self.params.editor_state.clone(),
             (),
@@ -299,6 +305,7 @@ impl Plugin for RustSampler {
 
 
                 egui::CentralPanel::default().show(egui_ctx, |ui| {
+                    file_dialog.lock().unwrap().open();
 
                     /// ADSR
                     ui.label("Attack");
@@ -385,31 +392,32 @@ impl Plugin for RustSampler {
 
 
     
-                    // Handle the image
-                    let image_path = "/Users/jiaheqian/Downloads/DALL·E 2024-04-25 02.40.14 - A detailed retro-style illustration of a music sampler with numerous knobs and buttons, depicting a complex old-school mixing environment. Include vin.webp";
-                    let image_data = std::fs::read(image_path).expect("Failed to read image file");
-                    let image = image::load_from_memory(&image_data).expect("Failed to load image");
+                    // // Handle the image
+                    // let image_path = "DALL·E 2024-04-25 02.40.14 - A detailed retro-style illustration of a music sampler with numerous knobs and buttons, depicting a complex old-school mixing environment. Include vin.webp";
+                    // let image_data = std::fs::read(image_path).expect("Failed to read image file");
+                    // let image = image::load_from_memory(&image_data).expect("Failed to load image");
     
-                    let (width, height) = image.dimensions();
-                    let rgba_image = image.to_rgba8();
+                    // let (width, height) = image.dimensions();
+                    // let rgba_image = image.to_rgba8();
     
-                    let color_pixels = rgba_image
-                        .pixels()
-                        .map(|p| egui::Color32::from_rgba_premultiplied(p[0], p[1], p[2], p[3]))
-                        .collect::<Vec<_>>();
+                    // let color_pixels = rgba_image
+                    //     .pixels()
+                    //     .map(|p| egui::Color32::from_rgba_premultiplied(p[0], p[1], p[2], p[3]))
+                    //     .collect::<Vec<_>>();
     
-                    let color_image = egui::ColorImage {
-                        size: [width as usize, height as usize],
-                        pixels: color_pixels,
-                    };
+                    // let color_image = egui::ColorImage {
+                    //     size: [width as usize, height as usize],
+                    //     pixels: color_pixels,
+                    // };
     
-                    let image_data = ImageData::from(color_image);
-                    let options = TextureOptions::default();
-                    let texture = egui_ctx.load_texture("background_image", image_data, options);
+                    // let image_data = ImageData::from(color_image);
+                    // let options = TextureOptions::default();
+                    // let texture = egui_ctx.load_texture("background_image", image_data, options);
     
-                    // Show the image
-                    ui.image((texture.id(), texture.size_vec2())); // Correct usage: as a tuple
+                    // // Show the image
+                    // ui.image((texture.id(), texture.size_vec2())); // Correct usage: as a tuple
                 });
+                file_dialog.lock().unwrap().show(egui_ctx);
             },
         )
     }
@@ -430,12 +438,9 @@ impl Plugin for RustSampler {
         // function if you do not need it.
         let engine_ = SamplerEngine::new(_buffer_config.sample_rate, 2);
         self.engine = Some(engine_);
-        // Tests to see if second file will overwrite first file
-        self.engine.as_mut().unwrap().load_file_from_path("/Users/jiaheqian/Desktop/Rust Sample/Interaction_PoseDetection_Scissors_02.wav");
-        self.engine.as_mut().unwrap().add_to_paths_and_load("/Users/jiaheqian/Desktop/Rust Sample/Interaction_PoseDetection_Stop_01.wav");
-        self.engine.as_mut().unwrap().set_mode(SamplerMode::Warp);
-        self.engine.as_mut().unwrap().set_warp_base(64);
-        self.engine.as_mut().unwrap().set_warp_base(60);
+        // self.engine.as_mut().unwrap().add_to_paths_and_load("PG CADENCE Accent - Snowball - Bb.wav");
+        // self.engine.as_mut().unwrap().set_mode(SamplerMode::Warp);
+        // self.engine.as_mut().unwrap().set_warp_base(58);
         true
     }
 
