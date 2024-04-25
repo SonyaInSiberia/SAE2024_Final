@@ -312,6 +312,22 @@ impl Plugin for RustSampler {
 
 
 
+
+
+                    // comnbo box 
+                    ui.label("Sustain Mode");                    
+                    ui.horizontal(|ui| {
+                        let mut selected_m = params.sus_mode.value();
+                        ui.selectable_value(&mut selected_m, SustainModes::NoLoop, "No Loop");
+                        ui.selectable_value(&mut selected_m, SustainModes::LoopWrap, "Loop Wrap");
+                        ui.selectable_value(&mut selected_m, SustainModes::LoopBounce, "Loop Bounce");
+                        if selected_m != params.sus_mode.value() {
+                            setter.set_parameter(&params.sus_mode, selected_m)
+                        }
+                    });
+                    ui.end_row();
+
+
                     // Handle the gain slider
                     let mut gain_db = util::gain_to_db(params.gain.value());
                     let slider = egui::Slider::new(&mut gain_db, -70.0..=6.0).text("Gain");
@@ -320,35 +336,6 @@ impl Plugin for RustSampler {
                     if response.changed() {
                         setter.set_parameter(&params.gain, util::db_to_gain(gain_db));
                     }
-                    
-                    // // Handle the attack slider
-                    // let mut attack = params.attack.value();
-                    // let attack_slider = egui::Slider::new(&mut attack, 0.0..=1000.0).text("Attack (ms)");
-                    // if ui.add(attack_slider).changed() {
-                    //     setter.set_parameter(&params.attack, attack);
-                    // }
-
-                    // // Handle the decay slider
-                    // let mut decay = params.decay.value();
-                    // let decay_slider = egui::Slider::new(&mut decay, 0.0..=1000.0).text("Decay (ms)");
-                    // if ui.add(decay_slider).changed() {
-                    //     setter.set_parameter(&params.decay, decay);
-                    // }
-
-                    // // Handle the sustain slider
-                    // let mut sustain = params.sustain.value();
-                    // let sustain_slider = egui::Slider::new(&mut sustain, 0.0..=1.0).text("Sustain");
-                    // if ui.add(sustain_slider).changed() {
-                    //     setter.set_parameter(&params.sustain, sustain);
-                    // }
-
-                    // // Handle the release slider
-                    // let mut release = params.release.value();
-                    // let release_slider = egui::Slider::new(&mut release, 0.0..=2000.0).text("Release (ms)");
-                    // if ui.add(release_slider).changed() {
-                    //     setter.set_parameter(&params.release, release);
-                    // }
-
                     // Additional parameters...
                     // Example for start_point and end_point
                     let mut start_point = params.start_point.value();
@@ -385,16 +372,8 @@ impl Plugin for RustSampler {
                         setter.set_parameter(&params.sus_end, sus_end);
                     }
 
-                    // Handle the sus_mode enum selector
-                    let sus_mode_labels = SustainModes::iter().map(|mode| mode.to_string()).collect::<Vec<_>>();
-                    let mut current_mode = params.sus_mode.index();
-                    if ui.add(egui::ComboBox::from_label("Sustain Mode").selected_text(sus_mode_labels[current_mode].clone()).show_ui(ui, |ui| {
-                        sus_mode_labels.iter().enumerate().for_each(|(idx, mode)| {
-                            ui.selectable_value(&mut current_mode, idx, mode);
-                        })
-                    })).changed() {
-                        setter.set_parameter(&params.sus_mode, SustainModes::from_index(current_mode).unwrap());
-                    }
+
+
 
                     // Handle the fade_time slider
                     let mut fade_time = params.fade_time.value();
