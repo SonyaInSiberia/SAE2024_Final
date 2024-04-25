@@ -26,7 +26,7 @@ use std::fs;
 
 struct RustSampler {
     params: Arc<RustSamplerParams>,
-    engine: Option<SamplerEngine>,
+    engine: Option<SamplerEngine>,  
 }
 
 #[derive(Params)]
@@ -70,12 +70,9 @@ impl Default for RustSampler {
         Self {
             params: Arc::new(RustSamplerParams::default()),
             engine: None,
-
-        }
+            }
     }
 }
-
-
 
 impl Default for RustSamplerParams {
     fn default() -> Self {
@@ -219,7 +216,6 @@ impl Plugin for RustSampler {
         self.params.clone()
     }
 
-
     
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let params = self.params.clone();
@@ -300,6 +296,7 @@ impl Plugin for RustSampler {
 
                 egui::CentralPanel::default().show(egui_ctx, |ui| {
 
+
                     /// ADSR
                     ui.label("Attack");
                     ui.add(widgets::ParamSlider::for_param(&params.attack, setter));
@@ -371,8 +368,6 @@ impl Plugin for RustSampler {
                         setter.set_parameter(&params.fade_time, fade_time);
                     }
 
-
-
     
                     // Handle the image
                     let image_path = "/Users/jiaheqian/Downloads/DALL·E 2024-04-25 02.40.14 - A detailed retro-style illustration of a music sampler with numerous knobs and buttons, depicting a complex old-school mixing environment. Include vin.webp";
@@ -399,14 +394,12 @@ impl Plugin for RustSampler {
                     // Show the image
                     ui.image((texture.id(), texture.size_vec2())); // Correct usage: as a tuple
                 });
+
+                
             },
         )
     }
     
-    
-    
-
-
     
     fn initialize(
         &mut self,
@@ -419,9 +412,9 @@ impl Plugin for RustSampler {
         // function if you do not need it.
         let engine_ = SamplerEngine::new(_buffer_config.sample_rate, 2);
         self.engine = Some(engine_);
+
         // Tests to see if second file will overwrite first file
-        self.engine.as_mut().unwrap().load_file_from_path("/Users/carsonzhang/Desktop/GT/SP24/MUSI 6106 Audio Software Engineering/SAE2024_Final/RustSampler/audio/guitar.wav");
-        self.engine.as_mut().unwrap().add_to_paths_and_load("/Users/carsonzhang/Desktop/GT/SP24/MUSI 6106 Audio Software Engineering/SAE2024_Final/RustSampler/audio/sweep.wav");
+        self.engine.as_mut().unwrap().load_file_from_path("/Users/davidjones/Desktop/Cymatics_Pluck.wav");
         self.engine.as_mut().unwrap().set_mode(SamplerMode::Warp);
         self.engine.as_mut().unwrap().set_warp_base(64);
         self.engine.as_mut().unwrap().set_warp_base(60);
@@ -455,6 +448,7 @@ impl Plugin for RustSampler {
                 }
                 next_event = context.next_event();
             }
+
             for sample in channel_samples {
                 let gain = self.params.gain.smoothed.next();
                 let attack = self.params.attack.smoothed.next()*0.001;
