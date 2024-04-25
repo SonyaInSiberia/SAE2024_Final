@@ -8,6 +8,11 @@ mod sampler_engine;
 mod crossfade;
 use sampler_engine::{SamplerEngine,SamplerMode};
 use sampler_voice::SustainModes;
+use egui::{ColorImage, ImageData, TextureHandle, TextureOptions, Context as EguiContext, Color32};
+use image::{DynamicImage, GenericImageView, ImageFormat, RgbaImage};
+
+use std::fs;
+
 
 
 
@@ -66,6 +71,8 @@ impl Default for RustSampler {
     }
 }
 
+
+
 impl Default for RustSamplerParams {
     fn default() -> Self {
         Self {
@@ -79,7 +86,7 @@ impl Default for RustSamplerParams {
                 "Gain",
                 util::db_to_gain(0.0),
                 FloatRange::Skewed {
-                    min: util::db_to_gain(-30.0),
+                    min: util::db_to_gain(-70.0),
                     max: util::db_to_gain(6.0),
                     // This makes the range appear as if it was linear when displaying the values as
                     // decibels
@@ -208,6 +215,8 @@ impl Plugin for RustSampler {
         self.params.clone()
     }
 
+
+    
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let params = self.params.clone();
         create_egui_editor(
@@ -216,18 +225,88 @@ impl Plugin for RustSampler {
             |_, _| {},
             move |egui_ctx, setter, _state| {
                 egui::CentralPanel::default().show(egui_ctx, |ui| {
-                    // NOTE: See `plugins/diopser/src/editor.rs` for an example using the generic UI widget
-
-                    // This is a fancy widget that can get all the information it needs to properly
-                    // display and modify the parameter from the parametr itself
-                    // It's not yet fully implemented, as the text is missing.
-                    ui.label("Not Some random integer!!!!");
-                    egui_ctx
+                    // Handle the gain slider
+                    let mut gain_db = util::gain_to_db(params.gain.value());
+                    let slider = egui::Slider::new(&mut gain_db, -70.0..=6.0).text("Gain");
+                    let response = ui.add_sized([200.0, 40.0], slider);
+    
+                    if response.changed() {
+                        setter.set_parameter(&params.gain, util::db_to_gain(gain_db));
+                    }
                     
+                    // Handle the attack slider
+                    let mut attack = params.attack.value();
+                    let attack_slider = egui::Slider::new(&mut attack, 0.0..=1000.0).text("Attack (ms)");
+                    if ui.add(attack_slider).changed() {
+                        setter.set_parameter(&params.attack, attack);
+                    }
+
+                    // Handle the decay slider
+                    let mut decay = params.decay.value();
+                    let decay_slider = egui::Slider::new(&mut decay, 0.0..=1000.0).text("Decay (ms)");
+                    if ui.add(decay_slider).changed() {
+                        setter.set_parameter(&params.decay, decay);
+                    }
+
+                    // Handle the sustain slider
+                    let mut sustain = params.sustain.value();
+                    let sustain_slider = egui::Slider::new(&mut sustain, 0.0..=1.0).text("Sustain");
+                    if ui.add(sustain_slider).changed() {
+                        setter.set_parameter(&params.sustain, sustain);
+                    }
+
+                    // Handle the release slider
+                    let mut release = params.release.value();
+                    let release_slider = egui::Slider::new(&mut release, 0.0..=2000.0).text("Release (ms)");
+                    if ui.add(release_slider).changed() {
+                        setter.set_parameter(&params.release, release);
+                    }
+
+                    // Additional parameters...
+                    // Example for start_point and end_point
+                    let mut start_point = params.start_point.value();
+                    let start_point_slider = egui::Slider::new(&mut start_point, 0.0..=100.0).text("Start Point (%)");
+                    if ui.add(start_point_slider).changed() {
+                        setter.set_parameter(&params.start_point, start_point);
+                    }
+
+                    let mut end_point = params.end_point.value();
+                    let end_point_slider = egui::Slider::new(&mut end_point, 0.0..=100.0).text("End Point (%)");
+                    if ui.add(end_point_slider).changed() {
+                        setter.set_parameter(&params.end_point, end_point);
+                    }
+    
+                    // Handle the image
+                    let image_path = "/Users/jiaheqian/Desktop/funny-background-drawing-backgrounds-cartoon-1-5c9b97c68e299.png";
+                    let image_data = std::fs::read(image_path).expect("Failed to read image file");
+                    let image = image::load_from_memory(&image_data).expect("Failed to load image");
+    
+                    let (width, height) = image.dimensions();
+                    let rgba_image = image.to_rgba8();
+    
+                    let color_pixels = rgba_image
+                        .pixels()
+                        .map(|p| egui::Color32::from_rgba_premultiplied(p[0], p[1], p[2], p[3]))
+                        .collect::<Vec<_>>();
+    
+                    let color_image = egui::ColorImage {
+                        size: [width as usize, height as usize],
+                        pixels: color_pixels,
+                    };
+    
+                    let image_data = ImageData::from(color_image);
+                    let options = TextureOptions::default();
+                    let texture = egui_ctx.load_texture("background_image", image_data, options);
+    
+                    // Show the image
+                    ui.image((texture.id(), texture.size_vec2())); // Correct usage: as a tuple
                 });
             },
         )
     }
+    
+    
+    
 
 
     
