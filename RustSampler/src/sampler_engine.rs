@@ -6,7 +6,7 @@ use hound::SampleFormat;
 use adsr::AdsrState;
 use sofiza::{Instrument, Opcode};
 
-
+#[derive(Clone)]
 pub struct SamplerEngine{
     num_voices: u8,
     sound_bank: HashMap<u8,(String,f32,RingBuffer<f32>, SamplerVoice)>,
@@ -17,9 +17,9 @@ pub struct SamplerEngine{
     sample_rate: f32,
     num_channels: usize,
     warp_sr_scalar: f32,
-    instrument: Instrument
+    instrument: Instrument,
 }
-#[derive(PartialEq)]
+#[derive(PartialEq,Clone)]
 pub enum SamplerMode{
     Warp, // For when you just load one sample and want it to be pitch warped
     Assign, // For when you load multiple samples and assign them to midi notes
@@ -43,7 +43,7 @@ impl SamplerEngine{
             sample_rate: sample_rate_,
             num_channels: num_channels_,
             warp_sr_scalar: sample_rate_,
-            instrument: Instrument::new()
+            instrument: Instrument::new(),
         };
         engine.file_names.clear();
         engine
@@ -73,13 +73,33 @@ impl SamplerEngine{
     ///Add a file to the paths of files saved in the file names
     /// and load file into the warp buffer.
     pub fn add_to_paths_and_load(&mut self, file_path: &str){
-        self.warp_sr_scalar =  fill_warp_buffer(&mut self.warp_buffer, file_path)/
+        if file_path.ends_with(".wav"){
+            self.warp_sr_scalar =  fill_warp_buffer(&mut self.warp_buffer, file_path)/
                                 self.sample_rate;
-        self.file_names.push(file_path.to_string());
+            self.file_names.push(file_path.to_string());
+        }
     }
     ///Add a file to the paths of files saved in the file names.
     pub fn add_file_to_paths(&mut self, file_path: &str){
-        self.file_names.push(file_path.to_string());
+        if file_path.ends_with(".wav"){
+            self.file_names.push(file_path.to_string());
+        }
+    }
+    ///Load a file into the warp buffer from the list of filepaths that have been added
+    /// 
+    /// idx will wrap around the size of the file_paths buffer
+    pub fn load_file_by_index(&mut self, idx: usize){
+        if self.file_names.len() > 0{
+            let new_idx = idx % self.file_names.len();
+            if let Some(file_path) = self.file_names.get(new_idx){
+                self.warp_sr_scalar = fill_warp_buffer(&mut self.warp_buffer, &file_path)/self.sample_rate;
+            }
+        }
+    }
+
+    pub fn get_file_name_by_index(&mut self, idx: usize)->Option<String>{
+        let new_idx = idx % self.file_names.len();
+        self.file_names.get(new_idx).cloned()
     }
     ///Load file from path into the warp buffer without loading 
     /// into the file names.

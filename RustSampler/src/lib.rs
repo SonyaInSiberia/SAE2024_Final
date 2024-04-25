@@ -224,7 +224,6 @@ impl Plugin for RustSampler {
         self.params.clone()
     }
 
-
     
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let params = self.params.clone();
@@ -428,12 +427,7 @@ impl Plugin for RustSampler {
             },
         )
     }
-    
-    
-    
 
-
-    
     fn initialize(
         &mut self,
         _audio_io_layout: &AudioIOLayout,
@@ -480,6 +474,7 @@ impl Plugin for RustSampler {
                 }
                 next_event = context.next_event();
             }
+
             for sample in channel_samples {
                 let gain = self.params.gain.smoothed.next();
                 let attack = self.params.attack.smoothed.next()*0.001;

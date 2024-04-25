@@ -1,5 +1,5 @@
 use std::clone;
-
+use std::fmt;
 use crate::ring_buffer;
 use nih_plug::params::enums::Enum;
 use ring_buffer::RingBuffer;
@@ -41,7 +41,6 @@ impl SustainModes {
         [SustainModes::NoLoop, SustainModes::LoopWrap, SustainModes::LoopBounce].iter().copied()
     }
 }
-
 #[derive(Clone, Copy, PartialEq)]
 pub enum VoiceType{
     Warp,
