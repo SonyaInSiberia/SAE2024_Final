@@ -10,8 +10,12 @@ use sampler_engine::{SamplerEngine,SamplerMode};
 use sampler_voice::SustainModes;
 use egui::{ColorImage, ImageData, TextureHandle, TextureOptions, Context as EguiContext, Color32};
 use image::{DynamicImage, GenericImageView, ImageFormat, RgbaImage};
-
+use nih_plug::prelude::*;
+use egui::epaint::{PathShape, Pos2, Stroke, Rect};
 use std::fs;
+
+
+
 
 
 
@@ -224,7 +228,90 @@ impl Plugin for RustSampler {
             (),
             |_, _| {},
             move |egui_ctx, setter, _state| {
+
+                egui::Window::new("ADSR Curve")
+                // .vscroll(false)
+                // .resizable(false)
+                .default_size(egui::Vec2::new(200.0, 100.0))
+                .show(egui_ctx, |ui| {
+                    egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                        let (response, painter) =
+                            ui.allocate_painter(egui::Vec2::new(ui.available_width(), 200.0), egui::Sense::hover());
+
+                        let attack = params.attack.value();
+                        let decay = params.decay.value();
+                        let sustain = params.sustain.value();
+                        let release = params.release.value();
+
+                        let total_duration = 5000.0;
+
+                        let to_screen = egui::emath::RectTransform::from_to(
+                            egui::Rect::from_min_max(
+                                Pos2::new(0.0, 0.0),
+                                Pos2::new(total_duration, 1.0),
+                            ),
+                            response.rect,
+                        );
+
+                        let mut points = Vec::new();
+                        let num_points = 100;
+
+                        // Attack phase
+                        for i in 0..num_points {
+                            let t = i as f32 / num_points as f32 * attack;
+                            let y = 1.0 - (t / attack);
+                            points.push(Pos2::new(t, y));
+                        }
+
+                        // Decay phase
+                        let start_time = attack;
+                        let end_time = start_time + decay;
+                        for i in 0..num_points {
+                            let t = start_time + i as f32 / num_points as f32 * (end_time - start_time);
+                            let y = (1.0 - sustain) * i as f32 / num_points as f32;
+                            points.push(Pos2::new(t, y));
+                        }
+
+                        // Sustain phase
+                        let start_time = attack + decay;
+                        let end_time = total_duration - release;
+                        for i in 0..num_points {
+                            let t = start_time + i as f32 / num_points as f32 * (end_time - start_time);
+                            let y = 1.0 - sustain;
+                            points.push(Pos2::new(t, y));
+                        }
+
+                        // Release phase
+                        let start_time = total_duration - release;
+                        for i in 0..num_points {
+                            let t = start_time + i as f32 / num_points as f32 * release;
+                            let y = (1.0 - sustain) + i as f32 / num_points as f32 * sustain;
+                            points.push(Pos2::new(t, y));
+                        }
+
+                        let stroke = Stroke::new(1.0, Color32::from_rgb(50, 100, 150));
+                        let points_in_screen: Vec<Pos2> = points.iter().map(|p| to_screen * *p).collect();
+                        let path = PathShape::line(points_in_screen, stroke);
+                        painter.add(path);
+                    });
+                });
+
+
+
                 egui::CentralPanel::default().show(egui_ctx, |ui| {
+
+                    /// ADSR
+                    ui.label("Attack");
+                    ui.add(widgets::ParamSlider::for_param(&params.attack, setter));
+                    ui.label("Decay");
+                    ui.add(widgets::ParamSlider::for_param(&params.decay, setter));
+                    ui.label("Sustain");
+                    ui.add(widgets::ParamSlider::for_param(&params.sustain, setter));
+                    ui.label("Release");
+                    ui.add(widgets::ParamSlider::for_param(&params.release, setter));
+
+
+
                     // Handle the gain slider
                     let mut gain_db = util::gain_to_db(params.gain.value());
                     let slider = egui::Slider::new(&mut gain_db, -70.0..=6.0).text("Gain");
@@ -234,33 +321,33 @@ impl Plugin for RustSampler {
                         setter.set_parameter(&params.gain, util::db_to_gain(gain_db));
                     }
                     
-                    // Handle the attack slider
-                    let mut attack = params.attack.value();
-                    let attack_slider = egui::Slider::new(&mut attack, 0.0..=1000.0).text("Attack (ms)");
-                    if ui.add(attack_slider).changed() {
-                        setter.set_parameter(&params.attack, attack);
-                    }
+                    // // Handle the attack slider
+                    // let mut attack = params.attack.value();
+                    // let attack_slider = egui::Slider::new(&mut attack, 0.0..=1000.0).text("Attack (ms)");
+                    // if ui.add(attack_slider).changed() {
+                    //     setter.set_parameter(&params.attack, attack);
+                    // }
 
-                    // Handle the decay slider
-                    let mut decay = params.decay.value();
-                    let decay_slider = egui::Slider::new(&mut decay, 0.0..=1000.0).text("Decay (ms)");
-                    if ui.add(decay_slider).changed() {
-                        setter.set_parameter(&params.decay, decay);
-                    }
+                    // // Handle the decay slider
+                    // let mut decay = params.decay.value();
+                    // let decay_slider = egui::Slider::new(&mut decay, 0.0..=1000.0).text("Decay (ms)");
+                    // if ui.add(decay_slider).changed() {
+                    //     setter.set_parameter(&params.decay, decay);
+                    // }
 
-                    // Handle the sustain slider
-                    let mut sustain = params.sustain.value();
-                    let sustain_slider = egui::Slider::new(&mut sustain, 0.0..=1.0).text("Sustain");
-                    if ui.add(sustain_slider).changed() {
-                        setter.set_parameter(&params.sustain, sustain);
-                    }
+                    // // Handle the sustain slider
+                    // let mut sustain = params.sustain.value();
+                    // let sustain_slider = egui::Slider::new(&mut sustain, 0.0..=1.0).text("Sustain");
+                    // if ui.add(sustain_slider).changed() {
+                    //     setter.set_parameter(&params.sustain, sustain);
+                    // }
 
-                    // Handle the release slider
-                    let mut release = params.release.value();
-                    let release_slider = egui::Slider::new(&mut release, 0.0..=2000.0).text("Release (ms)");
-                    if ui.add(release_slider).changed() {
-                        setter.set_parameter(&params.release, release);
-                    }
+                    // // Handle the release slider
+                    // let mut release = params.release.value();
+                    // let release_slider = egui::Slider::new(&mut release, 0.0..=2000.0).text("Release (ms)");
+                    // if ui.add(release_slider).changed() {
+                    //     setter.set_parameter(&params.release, release);
+                    // }
 
                     // Additional parameters...
                     // Example for start_point and end_point
@@ -275,9 +362,52 @@ impl Plugin for RustSampler {
                     if ui.add(end_point_slider).changed() {
                         setter.set_parameter(&params.end_point, end_point);
                     }
+
+
+                    // Handle the num_voices slider
+                    let mut num_voices = params.num_voices.value() as i32;  // Casting to i32 for the slider
+                    let num_voices_slider = egui::Slider::new(&mut num_voices, 1..=24).text("Number of Voices");
+                    if ui.add(num_voices_slider).changed() {
+                        setter.set_parameter(&params.num_voices, num_voices as i32);  // Cast back to i32 if needed
+                    }
+
+                    // Handle the sus_start slider
+                    let mut sus_start = params.sus_start.value();
+                    let sus_start_slider = egui::Slider::new(&mut sus_start, 0.0..=100.0).text("Sustain Start (%)");
+                    if ui.add(sus_start_slider).changed() {
+                        setter.set_parameter(&params.sus_start, sus_start);
+                    }
+
+                    // Handle the sus_end slider
+                    let mut sus_end = params.sus_end.value();
+                    let sus_end_slider = egui::Slider::new(&mut sus_end, 0.0..=100.0).text("Sustain End (%)");
+                    if ui.add(sus_end_slider).changed() {
+                        setter.set_parameter(&params.sus_end, sus_end);
+                    }
+
+                    // Handle the sus_mode enum selector
+                    let sus_mode_labels = SustainModes::iter().map(|mode| mode.to_string()).collect::<Vec<_>>();
+                    let mut current_mode = params.sus_mode.index();
+                    if ui.add(egui::ComboBox::from_label("Sustain Mode").selected_text(sus_mode_labels[current_mode].clone()).show_ui(ui, |ui| {
+                        sus_mode_labels.iter().enumerate().for_each(|(idx, mode)| {
+                            ui.selectable_value(&mut current_mode, idx, mode);
+                        })
+                    })).changed() {
+                        setter.set_parameter(&params.sus_mode, SustainModes::from_index(current_mode).unwrap());
+                    }
+
+                    // Handle the fade_time slider
+                    let mut fade_time = params.fade_time.value();
+                    let fade_time_slider = egui::Slider::new(&mut fade_time, 0.0..=500.0).text("Crossfade Time (ms)");
+                    if ui.add(fade_time_slider).changed() {
+                        setter.set_parameter(&params.fade_time, fade_time);
+                    }
+
+
+
     
                     // Handle the image
-                    let image_path = "/Users/jiaheqian/Desktop/funny-background-drawing-backgrounds-cartoon-1-5c9b97c68e299.png";
+                    let image_path = "/Users/jiaheqian/Downloads/DALL·E 2024-04-25 02.40.14 - A detailed retro-style illustration of a music sampler with numerous knobs and buttons, depicting a complex old-school mixing environment. Include vin.webp";
                     let image_data = std::fs::read(image_path).expect("Failed to read image file");
                     let image = image::load_from_memory(&image_data).expect("Failed to load image");
     
