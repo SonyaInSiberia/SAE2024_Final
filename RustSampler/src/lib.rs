@@ -1,14 +1,14 @@
 use nih_plug::prelude::*;
-use std::sync::Arc;
 use nih_plug_egui::{create_egui_editor, egui, widgets, EguiState};
+use std::sync::Arc;
 mod adsr;
-mod ring_buffer;
-mod sampler_voice;
-mod sampler_engine;
+use egui::epaint::{Color32, PathShape, Pos2, Stroke, Rect};
 mod crossfade;
-use sampler_engine::{SamplerEngine,SamplerMode};
+mod ring_buffer;
+mod sampler_engine;
+mod sampler_voice;
+use sampler_engine::{SamplerEngine, SamplerMode};
 use sampler_voice::SustainModes;
-
 
 // This is a shortened version of the gain example with most comments removed, check out
 // https://github.com/robbert-vdh/nih-plug/blob/master/plugins/examples/gain/src/lib.rs to get
@@ -60,7 +60,6 @@ impl Default for RustSampler {
         Self {
             params: Arc::new(RustSamplerParams::default()),
             engine: None,
-
         }
     }
 }
@@ -68,7 +67,7 @@ impl Default for RustSampler {
 impl Default for RustSamplerParams {
     fn default() -> Self {
         Self {
-            editor_state: EguiState::from_size(300, 180),
+            editor_state: EguiState::from_size(500, 500),
             // This gain is stored as linear gain. NIH-plug comes with useful conversion functions
             // to treat these kinds of parameters as if we were dealing with decibels. Storing this
             // as decibels is easier to work with, but requires a conversion for every sample.
@@ -94,71 +93,98 @@ impl Default for RustSamplerParams {
             .with_string_to_value(formatters::s2v_f32_gain_to_db()),
             attack: FloatParam::new(
                 "Attack",
-                0.0, 
-                FloatRange::Linear { min: 0.0, max: 1000.0 })
-                .with_smoother(SmoothingStyle::Linear(20.0))
-                .with_unit("ms"),
+                0.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 1000.0,
+                },
+            )
+            .with_smoother(SmoothingStyle::Linear(20.0))
+            .with_unit("ms"),
             decay: FloatParam::new(
                 "Decay",
-                100.0, 
-                FloatRange::Linear { min: 0.0, max: 1000.0 })
-                .with_smoother(SmoothingStyle::Linear(20.0))
-                .with_unit("ms"),
-            sustain: FloatParam::new(
-                "Sustain",
-                1.0, 
-                FloatRange::Linear { min: 0.0, max: 1.0 })
+                100.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 1000.0,
+                },
+            )
+            .with_smoother(SmoothingStyle::Linear(20.0))
+            .with_unit("ms"),
+            sustain: FloatParam::new("Sustain", 1.0, FloatRange::Linear { min: 0.0, max: 1.0 })
                 .with_smoother(SmoothingStyle::Linear(20.0)),
             release: FloatParam::new(
                 "Release",
-                200.0, 
-                FloatRange::Linear { min: 0.0, max: 2000.0 })
-                .with_smoother(SmoothingStyle::Linear(20.0))
-                .with_unit("ms"),
+                200.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 2000.0,
+                },
+            )
+            .with_smoother(SmoothingStyle::Linear(20.0))
+            .with_unit("ms"),
             start_point: FloatParam::new(
                 "Start Point",
-                0.0, 
-                FloatRange::Linear { min: 0.0, max: 100.0})
-                .with_smoother(SmoothingStyle::Linear(20.0))
-                .with_unit("%")
-                .with_step_size(0.001),
+                0.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 100.0,
+                },
+            )
+            .with_smoother(SmoothingStyle::Linear(20.0))
+            .with_unit("%")
+            .with_step_size(0.001),
             end_point: FloatParam::new(
                 "End Point",
-                100.0, 
-                FloatRange::Linear { min: 0.0, max: 100.0 })
-                .with_smoother(SmoothingStyle::Linear(20.0))
-                .with_unit("%")
-                .with_step_size(0.001),
-            num_voices: IntParam::new( //Max Number of Voices
+                100.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 100.0,
+                },
+            )
+            .with_smoother(SmoothingStyle::Linear(20.0))
+            .with_unit("%")
+            .with_step_size(0.001),
+            num_voices: IntParam::new(
+                //Max Number of Voices
                 "Voices",
                 6,
-                IntRange::Linear { min: 1, max: 24 }
+                IntRange::Linear { min: 1, max: 24 },
             ),
             sus_start: FloatParam::new(
                 "Sustain Start",
-                40.0, 
-                FloatRange::Linear { min: 0.0, max: 100.0})
-                .with_smoother(SmoothingStyle::Linear(20.0))
-                .with_unit("%")
-                .with_step_size(0.001),
+                40.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 100.0,
+                },
+            )
+            .with_smoother(SmoothingStyle::Linear(20.0))
+            .with_unit("%")
+            .with_step_size(0.001),
             sus_end: FloatParam::new(
                 "Sustain End",
-                60.0, 
-                FloatRange::Linear { min: 0.0, max: 100.0 })
-                .with_smoother(SmoothingStyle::Linear(20.0))
-                .with_unit("%")
-                .with_step_size(0.001),
-            sus_mode: EnumParam::new(
-                "Sustain Mode",
-                SustainModes::NoLoop,
-            ),
+                60.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 100.0,
+                },
+            )
+            .with_smoother(SmoothingStyle::Linear(20.0))
+            .with_unit("%")
+            .with_step_size(0.001),
+            sus_mode: EnumParam::new("Sustain Mode", SustainModes::NoLoop),
             fade_time: FloatParam::new(
                 "Crossfade time",
-                0.0, 
-                FloatRange::Linear { min: 0.0, max: 500.0 })
-                .with_smoother(SmoothingStyle::Linear(20.0))
-                .with_unit("ms")
-                .with_step_size(1.0),
+                0.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 500.0,
+                },
+            )
+            .with_smoother(SmoothingStyle::Linear(20.0))
+            .with_unit("ms")
+            .with_step_size(1.0),
         }
     }
 }
@@ -166,7 +192,7 @@ impl Default for RustSamplerParams {
 impl Plugin for RustSampler {
     const NAME: &'static str = "RustSampler";
     const VENDOR: &'static str = "ASE Group 2";
-    const URL: &'static str =  env!("CARGO_PKG_HOMEPAGE");
+    const URL: &'static str = env!("CARGO_PKG_HOMEPAGE");
     const EMAIL: &'static str = "davidisjones10.gmail.com";
 
     const VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -186,7 +212,6 @@ impl Plugin for RustSampler {
         names: PortNames::const_default(),
     }];
 
-
     const MIDI_INPUT: MidiConfig = MidiConfig::Basic;
     const MIDI_OUTPUT: MidiConfig = MidiConfig::None;
 
@@ -205,6 +230,7 @@ impl Plugin for RustSampler {
         self.params.clone()
     }
 
+
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let params = self.params.clone();
         create_egui_editor(
@@ -212,14 +238,83 @@ impl Plugin for RustSampler {
             (),
             |_, _| {},
             move |egui_ctx, setter, _state| {
-                egui::CentralPanel::default().show(egui_ctx, |ui| {
-                    // NOTE: See `plugins/diopser/src/editor.rs` for an example using the generic UI widget
+                egui::Window::new("ADSR Curve")
+                    // .vscroll(false)
+                    // .resizable(false)
+                    .default_size(egui::Vec2::new(200.0, 100.0))
+                    .show(egui_ctx, |ui| {
+                        egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                            let (response, painter) =
+                                ui.allocate_painter(egui::Vec2::new(ui.available_width(), 200.0), egui::Sense::hover());
 
-                    // This is a fancy widget that can get all the information it needs to properly
-                    // display and modify the parameter from the parametr itself
-                    // It's not yet fully implemented, as the text is missing.
-                    ui.label("Some random integer");
-                    egui_ctx
+                            let attack = params.attack.value();
+                            let decay = params.decay.value();
+                            let sustain = params.sustain.value();
+                            let release = params.release.value();
+
+                            let total_duration = 5000.0;
+
+                            let to_screen = egui::emath::RectTransform::from_to(
+                                egui::Rect::from_min_max(
+                                    Pos2::new(0.0, 0.0),
+                                    Pos2::new(total_duration, 1.0),
+                                ),
+                                response.rect,
+                            );
+
+                            let mut points = Vec::new();
+                            let num_points = 100;
+
+                            // Attack phase
+                            for i in 0..num_points {
+                                let t = i as f32 / num_points as f32 * attack;
+                                let y = 1.0 - (t / attack);
+                                points.push(Pos2::new(t, y));
+                            }
+
+                            // Decay phase
+                            let start_time = attack;
+                            let end_time = start_time + decay;
+                            for i in 0..num_points {
+                                let t = start_time + i as f32 / num_points as f32 * (end_time - start_time);
+                                let y = (1.0 - sustain) * i as f32 / num_points as f32;
+                                points.push(Pos2::new(t, y));
+                            }
+
+                            // Sustain phase
+                            let start_time = attack + decay;
+                            let end_time = total_duration - release;
+                            for i in 0..num_points {
+                                let t = start_time + i as f32 / num_points as f32 * (end_time - start_time);
+                                let y = 1.0 - sustain;
+                                points.push(Pos2::new(t, y));
+                            }
+
+                            // Release phase
+                            let start_time = total_duration - release;
+                            for i in 0..num_points {
+                                let t = start_time + i as f32 / num_points as f32 * release;
+                                let y = (1.0 - sustain) + i as f32 / num_points as f32 * sustain;
+                                points.push(Pos2::new(t, y));
+                            }
+
+                            let stroke = Stroke::new(1.0, Color32::from_rgb(50, 100, 150));
+                            let points_in_screen: Vec<Pos2> = points.iter().map(|p| to_screen * *p).collect();
+                            let path = PathShape::line(points_in_screen, stroke);
+                            painter.add(path);
+                        });
+                    });
+
+                egui::CentralPanel::default().show(egui_ctx, |ui| {
+                    // ADSR parameter sliders
+                    ui.label("Attack");
+                    ui.add(widgets::ParamSlider::for_param(&params.attack, setter));
+                    ui.label("Decay");
+                    ui.add(widgets::ParamSlider::for_param(&params.decay, setter));
+                    ui.label("Sustain");
+                    ui.add(widgets::ParamSlider::for_param(&params.sustain, setter));
+                    ui.label("Release");
+                    ui.add(widgets::ParamSlider::for_param(&params.release, setter));
                 });
             },
         )
@@ -237,8 +332,8 @@ impl Plugin for RustSampler {
         let engine_ = SamplerEngine::new(_buffer_config.sample_rate, 2);
         self.engine = Some(engine_);
         // Tests to see if second file will overwrite first file
-        self.engine.as_mut().unwrap().load_file_from_path("/Users/davidjones/Desktop/0My_samples/808_drum_kit/808_drum_kit/classic 808/1 weird 808.wav");
-        self.engine.as_mut().unwrap().add_to_paths_and_load("/Users/davidjones/Desktop/0My_samples/Cymatics - Fantasy Synth Sample Pack/One Shots/Cymatics - Fantasy - Juno 106 BASS Rubber - C.wav");
+        self.engine.as_mut().unwrap().load_file_from_path("/Users/carsonzhang/Desktop/GT/SP24/MUSI 6106 Audio Software Engineering/SAE2024_Final/RustSampler/audio/guitar.wav");
+        self.engine.as_mut().unwrap().add_to_paths_and_load("/Users/carsonzhang/Desktop/GT/SP24/MUSI 6106 Audio Software Engineering/SAE2024_Final/RustSampler/audio/sweep.wav");
         self.engine.as_mut().unwrap().set_mode(SamplerMode::Warp);
         self.engine.as_mut().unwrap().set_warp_base(64);
         self.engine.as_mut().unwrap().set_warp_base(60);
@@ -260,8 +355,8 @@ impl Plugin for RustSampler {
         for channel_samples in buffer.iter_samples() {
             // Smoothing is optionally built into the parameters themselves
             // TODO: Find out why no audio... not getting midi messages
-            while let Some(event) = next_event{
-                match event{
+            while let Some(event) = next_event {
+                match event {
                     NoteEvent::NoteOn { note, velocity, .. } => {
                         self.engine.as_mut().unwrap().note_on(note, velocity);
                     }
@@ -274,22 +369,31 @@ impl Plugin for RustSampler {
             }
             for sample in channel_samples {
                 let gain = self.params.gain.smoothed.next();
-                let attack = self.params.attack.smoothed.next()*0.001;
-                let decay = self.params.decay.smoothed.next()*0.001;
+                let attack = self.params.attack.smoothed.next() * 0.001;
+                let decay = self.params.decay.smoothed.next() * 0.001;
                 let sustain = self.params.sustain.smoothed.next();
-                let release = self.params.release.smoothed.next()*0.001;
+                let release = self.params.release.smoothed.next() * 0.001;
                 let num_voices = self.params.num_voices.value();
                 let start = self.params.start_point.smoothed.next();
                 let end = self.params.end_point.smoothed.next();
                 let sus_start = self.params.sus_start.smoothed.next();
                 let sus_end = self.params.sus_end.smoothed.next();
                 let sus_mode = self.params.sus_mode.value();
-                let fade_time = self.params.fade_time.value()*0.001;
-                self.engine.as_mut().unwrap().set_num_voices(num_voices as u8);
-                self.engine.as_mut().unwrap().set_adsr_warp(attack, decay, sustain, release);
+                let fade_time = self.params.fade_time.value() * 0.001;
+                self.engine
+                    .as_mut()
+                    .unwrap()
+                    .set_num_voices(num_voices as u8);
+                self.engine
+                    .as_mut()
+                    .unwrap()
+                    .set_adsr_warp(attack, decay, sustain, release);
                 self.engine.as_mut().unwrap().set_points_warp(start, end);
                 self.engine.as_mut().unwrap().set_sus_looping_warp(sus_mode);
-                self.engine.as_mut().unwrap().set_sus_points_warp(sus_start, sus_end);
+                self.engine
+                    .as_mut()
+                    .unwrap()
+                    .set_sus_points_warp(sus_start, sus_end);
                 self.engine.as_mut().unwrap().set_fade_time_warp(fade_time);
                 *sample = self.engine.as_mut().unwrap().process();
                 *sample *= gain;
@@ -307,16 +411,23 @@ impl ClapPlugin for RustSampler {
     const CLAP_SUPPORT_URL: Option<&'static str> = None;
 
     // Don't forget to change these features
-    const CLAP_FEATURES: &'static [ClapFeature] = &[ClapFeature::AudioEffect, ClapFeature::Stereo, ClapFeature::Instrument];
+    const CLAP_FEATURES: &'static [ClapFeature] = &[
+        ClapFeature::AudioEffect,
+        ClapFeature::Stereo,
+        ClapFeature::Instrument,
+    ];
 }
 
 impl Vst3Plugin for RustSampler {
     const VST3_CLASS_ID: [u8; 16] = *b"Rust_Sampler_VST";
 
     // And also don't forget to change these categories
-    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] =
-        &[Vst3SubCategory::Fx, Vst3SubCategory::Dynamics, 
-        Vst3SubCategory::Generator,Vst3SubCategory::Instrument];
+    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[
+        Vst3SubCategory::Fx,
+        Vst3SubCategory::Dynamics,
+        Vst3SubCategory::Generator,
+        Vst3SubCategory::Instrument,
+    ];
 }
 
 nih_export_clap!(RustSampler);
