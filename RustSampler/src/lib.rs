@@ -10,6 +10,7 @@ use sampler_engine::{SamplerEngine,SamplerMode};
 use sampler_voice::SustainModes;
 
 
+
 // This is a shortened version of the gain example with most comments removed, check out
 // https://github.com/robbert-vdh/nih-plug/blob/master/plugins/examples/gain/src/lib.rs to get
 // started
@@ -68,10 +69,12 @@ impl Default for RustSampler {
 impl Default for RustSamplerParams {
     fn default() -> Self {
         Self {
-            editor_state: EguiState::from_size(300, 180),
+            editor_state: EguiState::from_size(800, 600),
             // This gain is stored as linear gain. NIH-plug comes with useful conversion functions
             // to treat these kinds of parameters as if we were dealing with decibels. Storing this
             // as decibels is easier to work with, but requires a conversion for every sample.
+
+            
             gain: FloatParam::new(
                 "Gain",
                 util::db_to_gain(0.0),
@@ -218,13 +221,16 @@ impl Plugin for RustSampler {
                     // This is a fancy widget that can get all the information it needs to properly
                     // display and modify the parameter from the parametr itself
                     // It's not yet fully implemented, as the text is missing.
-                    ui.label("Some random integer");
+                    ui.label("Not Some random integer!!!!");
                     egui_ctx
+                    
                 });
             },
         )
     }
 
+
+    
     fn initialize(
         &mut self,
         _audio_io_layout: &AudioIOLayout,
@@ -237,8 +243,8 @@ impl Plugin for RustSampler {
         let engine_ = SamplerEngine::new(_buffer_config.sample_rate, 2);
         self.engine = Some(engine_);
         // Tests to see if second file will overwrite first file
-        self.engine.as_mut().unwrap().load_file_from_path("/Users/davidjones/Desktop/0My_samples/808_drum_kit/808_drum_kit/classic 808/1 weird 808.wav");
-        self.engine.as_mut().unwrap().add_to_paths_and_load("/Users/davidjones/Desktop/0My_samples/Cymatics - Fantasy Synth Sample Pack/One Shots/Cymatics - Fantasy - Juno 106 BASS Rubber - C.wav");
+        self.engine.as_mut().unwrap().load_file_from_path("/Users/jiaheqian/Desktop/Rust Sample/Interaction_PoseDetection_Scissors_02.wav");
+        self.engine.as_mut().unwrap().add_to_paths_and_load("/Users/jiaheqian/Desktop/Rust Sample/Interaction_PoseDetection_Stop_01.wav");
         self.engine.as_mut().unwrap().set_mode(SamplerMode::Warp);
         self.engine.as_mut().unwrap().set_warp_base(64);
         self.engine.as_mut().unwrap().set_warp_base(60);
