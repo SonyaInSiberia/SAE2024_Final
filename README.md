@@ -1,4 +1,4 @@
-# SAE2024_Final
+# Rust Sampler
 
 
 ## Compilation Steps
