@@ -4,7 +4,7 @@
 ## Compilation Steps
 
 ### After installing Rust and cloning this repository, you can compile Ase Example as follows:
-
+demo video: https://youtu.be/IabgXZt028w
 1. First enter the directory in which this repository is cloned. For instance: 'cd Desktop/SAE2024_Final/'
 
 2. Then enter the RustSampler directory using 'cd RustSampler' 
