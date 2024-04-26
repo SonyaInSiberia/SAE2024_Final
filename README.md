@@ -16,6 +16,15 @@
 
 5. Move the file of your desired plugin format to your system's plug-in directory. For instance on mac it might look like this: '/Library/Audio/Plug-Ins/VST3'
 
+6. When using the RustSampler, be sure to only load sfz and wav files. All other file formats will be ignored. 
+
+## SFZ Stuff
+
+### If you would like to load sfz files into the sampler, some additional steps may be necessary
+ * There is an example sfz file [here]([https://www.google.com](https://github.com/SonyaInSiberia/SAE2024_Final/releases/tag/v1.0))
+1. When you download the file, you will need to edit the paths in the sfz file that point to all of the audio files. This can be done using your preferred text editor and using a find and replace all to replace the currnent paths with your own.
+   * This might look like this 'find: "auraaudio/Desktop/Salamander"  replace with: "<your username>/Downloads/SFZ Files/Salamander Grand Piano" '
+2. Once this is done, you should be able to navigate to that sfz file from the RustSampler and it should load immediately. If it does not load, there may be a problem with your file paths.
 ## GUI Image
 ![plot](./images/RustSampler_GUI.png)
 
