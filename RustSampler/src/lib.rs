@@ -1,5 +1,4 @@
 use nih_plug::prelude::*;
-use std::sync::Arc;
 use nih_plug_egui::{create_egui_editor, egui, widgets, EguiState};
 mod adsr;
 mod ring_buffer;
@@ -12,21 +11,18 @@ use egui::{ColorImage, ImageData, TextureHandle, TextureOptions, Context as Egui
 use image::{DynamicImage, GenericImageView, ImageFormat, RgbaImage};
 use nih_plug::prelude::*;
 use egui::epaint::{PathShape, Pos2, Stroke, Rect};
-use std::fs;
+use std::{fs, io::Seek};
+use egui_file::FileDialog;
+use homedir::get_my_home;
+use std::{path::PathBuf, sync::{Arc, Mutex}};
+use std::env::current_dir;
 
-
-
-
-
-
-
-// This is a shortened version of the gain example with most comments removed, check out
-// https://github.com/robbert-vdh/nih-plug/blob/master/plugins/examples/gain/src/lib.rs to get
-// started
 
 struct RustSampler {
     params: Arc<RustSamplerParams>,
     engine: Option<SamplerEngine>,  
+    file_dialog: Arc<Mutex<FileDialog>>,
+    file_path: Arc<FilePaths>,
 }
 
 #[derive(Params)]
@@ -69,7 +65,9 @@ impl Default for RustSampler {
     fn default() -> Self {
         Self {
             params: Arc::new(RustSamplerParams::default()),
+            file_dialog: Arc::new(Mutex::new(FileDialog::open_file(get_my_home().unwrap()))),
             engine: None,
+            file_path: Arc::new(FilePaths::new()),
             }
     }
 }
@@ -170,6 +168,7 @@ impl Default for RustSamplerParams {
                 .with_smoother(SmoothingStyle::Linear(20.0))
                 .with_unit("ms")
                 .with_step_size(1.0),
+
         }
     }
 }
@@ -219,6 +218,8 @@ impl Plugin for RustSampler {
     
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let params = self.params.clone();
+        let file_dialog = self.file_dialog.clone();
+        let mut file_path = self.file_path.clone();
         create_egui_editor(
             self.params.editor_state.clone(),
             (),
@@ -295,8 +296,14 @@ impl Plugin for RustSampler {
 
 
                 egui::CentralPanel::default().show(egui_ctx, |ui| {
-
-
+                    let mut start_text = "No File Loaded".to_string();
+                    if let Some(path) = file_path.get_path() {
+                        start_text = path.clone();
+                    }
+                    ui.label(start_text);
+                    if (ui.button("Open")).clicked() {
+                        file_dialog.lock().unwrap().open();
+                    }
                     /// ADSR
                     ui.label("Attack");
                     ui.add(widgets::ParamSlider::for_param(&params.attack, setter));
@@ -356,9 +363,13 @@ impl Plugin for RustSampler {
 
                     ui.label("Sustain Mode");
                     ui.horizontal(|ui| {
-                        ui.selectable_value(&mut params.sus_mode.value(), SustainModes::NoLoop, "No Loop");
-                        ui.selectable_value(&mut params.sus_mode.value(), SustainModes::LoopWrap, "Loop Wrap");
-                        ui.selectable_value(&mut params.sus_mode.value(), SustainModes::LoopBounce, "Loop Bounce");
+                        let mut selected_m = params.sus_mode.value();
+                        ui.selectable_value(&mut selected_m, SustainModes::NoLoop, "No Loop");
+                        ui.selectable_value(&mut selected_m, SustainModes::LoopWrap, "Loop Wrap");
+                        ui.selectable_value(&mut selected_m, SustainModes::LoopBounce, "Loop Bounce");
+                        if selected_m != params.sus_mode.value() {
+                            setter.set_parameter(&params.sus_mode, selected_m)
+                        }
                     });
                     ui.end_row();
                     // Handle the fade_time slider
@@ -370,32 +381,37 @@ impl Plugin for RustSampler {
 
     
                     // Handle the image
-                    let image_path = "/Users/jiaheqian/Downloads/DALL·E 2024-04-25 02.40.14 - A detailed retro-style illustration of a music sampler with numerous knobs and buttons, depicting a complex old-school mixing environment. Include vin.webp";
-                    let image_data = std::fs::read(image_path).expect("Failed to read image file");
-                    let image = image::load_from_memory(&image_data).expect("Failed to load image");
-    
-                    let (width, height) = image.dimensions();
-                    let rgba_image = image.to_rgba8();
-    
-                    let color_pixels = rgba_image
-                        .pixels()
-                        .map(|p| egui::Color32::from_rgba_premultiplied(p[0], p[1], p[2], p[3]))
-                        .collect::<Vec<_>>();
-    
-                    let color_image = egui::ColorImage {
-                        size: [width as usize, height as usize],
-                        pixels: color_pixels,
-                    };
-    
-                    let image_data = ImageData::from(color_image);
-                    let options = TextureOptions::default();
-                    let texture = egui_ctx.load_texture("background_image", image_data, options);
-    
-                    // Show the image
-                    ui.image((texture.id(), texture.size_vec2())); // Correct usage: as a tuple
-                });
+                    let image_path = "/Users/davidjones/Desktop/SAE2024_Final/RustSampler/assets/DALLE_image.webp";
+                    if let Ok(image_data) = std::fs::read(image_path){
+                        if let Ok(image) = image::load_from_memory(&image_data){
+                            let (width, height) = image.dimensions();
+                            let rgba_image = image.to_rgba8();
 
-                
+                            let color_pixels = rgba_image
+                                .pixels()
+                                .map(|p| egui::Color32::from_rgba_premultiplied(p[0], p[1], p[2], p[3]))
+                                .collect::<Vec<_>>();
+
+                            let color_image = egui::ColorImage {
+                                size: [width as usize, height as usize],
+                                pixels: color_pixels,
+                            };
+                        
+                            let image_data = ImageData::from(color_image);
+                            let options = TextureOptions::default();
+                            let texture = egui_ctx.load_texture("background_image", image_data, options);
+                        
+                            // Show the image
+                            ui.image((texture.id(), texture.size_vec2())); // Correct usage: as a tuple
+                        }
+                    }
+                }); 
+                if file_dialog.lock().unwrap().show(egui_ctx).selected() {
+                    if let Some(file) = file_dialog.lock().unwrap().path() {
+                        file_path.set_path(String::from(file.to_str().unwrap()));
+                        dbg!(Some(file.to_path_buf()));
+                    }
+                } 
             },
         )
     }
@@ -413,10 +429,7 @@ impl Plugin for RustSampler {
         let engine_ = SamplerEngine::new(_buffer_config.sample_rate, 2);
         self.engine = Some(engine_);
 
-        // Tests to see if second file will overwrite first file
-        self.engine.as_mut().unwrap().load_file_from_path("/Users/davidjones/Desktop/Cymatics_Pluck.wav");
         self.engine.as_mut().unwrap().set_mode(SamplerMode::Warp);
-        self.engine.as_mut().unwrap().set_warp_base(64);
         self.engine.as_mut().unwrap().set_warp_base(60);
         true
     }
@@ -424,6 +437,15 @@ impl Plugin for RustSampler {
     fn reset(&mut self) {
         // Reset buffers and envelopes here. This can be called from the audio thread and may not
         // allocate. You can remove this function if you do not need it.
+        if let Some(path) = self.file_path.get_path(){
+            if path.ends_with(".wav"){
+                self.engine.as_mut().unwrap().set_mode(SamplerMode::Warp);
+                self.engine.as_mut().unwrap().load_file_from_path(&path);
+            }else if path.ends_with(".sfz"){
+                self.engine.as_mut().unwrap().load_sfz(path.as_str());
+                self.engine.as_mut().unwrap().set_mode(SamplerMode::Sfz);
+            }
+        }
     }
 
     fn process(
@@ -433,6 +455,11 @@ impl Plugin for RustSampler {
         context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
         let mut next_event = context.next_event();
+        
+        if self.file_path.is_new_file_loaded(){
+            self.file_path.clear_new_file_flag();
+            self.reset();
+        }
         for channel_samples in buffer.iter_samples() {
             // Smoothing is optionally built into the parameters themselves
             // TODO: Find out why no audio... not getting midi messages
@@ -474,6 +501,43 @@ impl Plugin for RustSampler {
         }
 
         ProcessStatus::Normal
+    }
+}
+
+pub struct FilePaths {
+    path: Mutex<Option<String>>,
+    new_file_loaded: Mutex<bool>,
+}
+
+impl FilePaths {
+    pub fn new() -> Self {
+        Self {
+            path: Mutex::new(None),
+            new_file_loaded: Mutex::new(false),
+        }
+    }
+
+    pub fn set_path(&self, path: String) {
+        let mut guard = self.path.lock().unwrap();
+        *guard = Some(path);
+        *self.new_file_loaded.lock().unwrap() = true;
+    }
+
+    pub fn get_path(&self) -> Option<String> {
+        self.path.lock().unwrap().clone()
+    }
+
+    pub fn clear(&self) {
+        let mut guard = self.path.lock().unwrap();
+        *guard = None;
+    }
+
+    pub fn is_new_file_loaded(&self) -> bool {
+        *self.new_file_loaded.lock().unwrap()
+    }
+
+    pub fn clear_new_file_flag(&self) {
+        *self.new_file_loaded.lock().unwrap() = false;
     }
 }
 

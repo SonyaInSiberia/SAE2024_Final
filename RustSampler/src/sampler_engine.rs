@@ -503,8 +503,8 @@ impl SamplerEngine{
 
 /// Fills a buffer with a file from a path
 fn fill_warp_buffer(buffer: &mut RingBuffer<f32>, path: &str) ->f32{
-    let mut reader = hound::WavReader::open(path).unwrap();
-    let sample_format = reader.spec().sample_format;
+    if let Ok(mut reader) = hound::WavReader::open(path){
+        let sample_format = reader.spec().sample_format;
     let sample_rate = reader.spec().sample_rate as f32;
     let length = reader.len();
     buffer.resize(length as usize, 0.0);
@@ -547,12 +547,16 @@ fn fill_warp_buffer(buffer: &mut RingBuffer<f32>, path: &str) ->f32{
         }
     }
     sample_rate as f32
+    }else {
+        dbg!("File Failed to load");
+        44100.0
+    }
+    
 }
 
 fn create_buffer(path: &str)-> (RingBuffer<f32>,f32){
-    // TODO: Add sample rate multiplier
-    let mut reader = hound::WavReader::open(path).unwrap();
-    let sample_format = reader.spec().sample_format;
+    if let Ok(mut reader) = hound::WavReader::open(path){
+        let sample_format = reader.spec().sample_format;
     let num_channels = reader.spec().channels as usize;
     let sample_rate = reader.spec().sample_rate as f32;
     let length = reader.len();
@@ -596,4 +600,9 @@ fn create_buffer(path: &str)-> (RingBuffer<f32>,f32){
         }
     }
     (buffer,sample_rate)
+    }else{
+        dbg!("File Failed to load");
+        (RingBuffer::new(1), 44100.0)
+    }
+    
 }
