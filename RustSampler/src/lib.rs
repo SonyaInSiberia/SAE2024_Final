@@ -1,5 +1,3 @@
-use egui_file::FileDialog;
-use homedir::get_my_home;
 use nih_plug::prelude::*;
 use nih_plug_egui::{create_egui_editor, egui, widgets, EguiState};
 mod adsr;
@@ -25,9 +23,6 @@ struct RustSampler {
     engine: Option<SamplerEngine>,  
     file_dialog: Arc<Mutex<FileDialog>>,
     file_path: Arc<FilePaths>,
-    selected_sfz_path: Arc<Option<PathBuf>>,
-    sfz_file_dialog: Arc<Mutex<FileDialog>>,
-    engine: Option<SamplerEngine>,
 }
 
 #[derive(Params)]
@@ -73,15 +68,9 @@ impl Default for RustSampler {
             file_dialog: Arc::new(Mutex::new(FileDialog::open_file(get_my_home().unwrap()))),
             engine: None,
             file_path: Arc::new(FilePaths::new()),
-            selected_sfz_path: Arc::new(Option::None),
-            sfz_file_dialog: Arc::new(Mutex::new(FileDialog::open_file(get_my_home().unwrap())))
             }
-
-        
     }
 }
-
-
 
 impl Default for RustSamplerParams {
     fn default() -> Self {
@@ -231,8 +220,6 @@ impl Plugin for RustSampler {
         let params = self.params.clone();
         let file_dialog = self.file_dialog.clone();
         let mut file_path = self.file_path.clone();
-        let sfz_file_dialog = self.sfz_file_dialog.clone();
-        let mut sfz_path = self.selected_sfz_path.clone();
         create_egui_editor(
             self.params.editor_state.clone(),
             (),
@@ -317,10 +304,6 @@ impl Plugin for RustSampler {
                     if (ui.button("Open")).clicked() {
                         file_dialog.lock().unwrap().open();
                     }
-                    if (ui.button("Open")).clicked() {
-                        sfz_file_dialog.lock().unwrap().open();
-                    }
-
                     /// ADSR
                     ui.label("Attack");
                     ui.add(widgets::ParamSlider::for_param(&params.attack, setter));
@@ -331,22 +314,6 @@ impl Plugin for RustSampler {
                     ui.label("Release");
                     ui.add(widgets::ParamSlider::for_param(&params.release, setter));
 
-
-
-
-
-                    // comnbo box 
-                    ui.label("Sustain Mode");                    
-                    ui.horizontal(|ui| {
-                        let mut selected_m = params.sus_mode.value();
-                        ui.selectable_value(&mut selected_m, SustainModes::NoLoop, "No Loop");
-                        ui.selectable_value(&mut selected_m, SustainModes::LoopWrap, "Loop Wrap");
-                        ui.selectable_value(&mut selected_m, SustainModes::LoopBounce, "Loop Bounce");
-                        if selected_m != params.sus_mode.value() {
-                            setter.set_parameter(&params.sus_mode, selected_m)
-                        }
-                    });
-                    ui.end_row();
 
 
                     // Handle the gain slider
@@ -412,8 +379,6 @@ impl Plugin for RustSampler {
                         setter.set_parameter(&params.fade_time, fade_time);
                     }
 
-
-
     
                     // Handle the image
                     let image_path = "/Users/jiaheqian/Desktop/Rust Sample/DALL·E 2024-04-25 02.40.14 - A detailed retro-style illustration of a music sampler with numerous knobs and buttons, depicting a complex old-school mixing environment. Include vin.webp";
@@ -450,7 +415,8 @@ impl Plugin for RustSampler {
             },
         )
     }
-
+    
+    
     fn initialize(
         &mut self,
         _audio_io_layout: &AudioIOLayout,
@@ -465,11 +431,6 @@ impl Plugin for RustSampler {
 
         self.engine.as_mut().unwrap().set_mode(SamplerMode::Warp);
         self.engine.as_mut().unwrap().set_warp_base(60);
-        // self.engine.as_mut().unwrap().add_to_paths_and_load("/Users/evanmurray/Downloads/PG CADENCE Accent - Snowball - Bb.wav");
-        // self.engine.as_mut().unwrap().set_mode(SamplerMode::Warp);
-        // self.engine.as_mut().unwrap().set_warp_base(58);
-        // self.engine.as_mut().unwrap().set_mode(SamplerMode::Sfz);
-        self.engine.as_mut().unwrap().load_sfz("/Users/jiaheqian/Desktop/Rust Sample/SFZ Files/Salamander Grand Piano/Salamander.sfz");
         true
     }
 
