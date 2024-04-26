@@ -14,9 +14,12 @@
 
 4. Then, in the 'RustSampler/Target/bundled/' directory there will be a RustSampler.vst3 file and a RustSampler.clap file
 
-5. Move the file of your desired plugin format to your system's plug-in directory. For instance on mac it might look like this: '/Library/Audio/Plug-Ins/VST3'
+5. Move the file of your desired plugin format to your system's plug-in directory. For instance, on mac it might look like this: '/Library/Audio/Plug-Ins/VST3'
 
-6. When using the RustSampler, be sure to only load sfz and wav files. All other file formats will be ignored. 
+6. You can launch DAW in developer mode to see the terminal from the DAW, for instance, launch REAPER in developer mode using the command `$./REAPER -d` in the directory where REAPER is installed
+
+7. When using the RustSampler, be sure to only load sfz and wav files. All other file formats will be ignored.
+
 
 ## SFZ Stuff
 
@@ -28,5 +31,7 @@
 ## GUI Image
 ![plot](./images/RustSampler_GUI.png)
 
+## GUI Framework
+The VST Plug-in GUI is achieved using [nig-plug-egui](https://github.com/robbert-vdh/nih-plug/tree/master/nih_plug_egui) crate based on [egui baseview](https://github.com/BillyDM/egui-baseview). The ADSR envelope visualization is achieved using `epaint` from `egui` crate.
 
 
