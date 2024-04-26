@@ -381,7 +381,7 @@ impl Plugin for RustSampler {
 
     
                     // Handle the image
-                    let image_path = "/Users/davidjones/Desktop/SAE2024_Final/RustSampler/assets/DALLE_image.webp";
+                    let image_path = "/Users/jiaheqian/Desktop/Rust Sample/DALL·E 2024-04-25 02.40.14 - A detailed retro-style illustration of a music sampler with numerous knobs and buttons, depicting a complex old-school mixing environment. Include vin.webp";
                     if let Ok(image_data) = std::fs::read(image_path){
                         if let Ok(image) = image::load_from_memory(&image_data){
                             let (width, height) = image.dimensions();
