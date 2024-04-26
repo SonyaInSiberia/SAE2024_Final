@@ -15,7 +15,7 @@
 * Move the file of your desired plugin format to your system's plug-in directory. For instance on mac it might look like this: '/Library/Audio/Plug-Ins/VST3'
 
 ## GUI Image
-![Image Title](https://raw.githubusercontent.com/SonyaInSiberia/SAE2024_Final/Sampler-GUI/images/RustSampler_GUI.png)
+![plot](./images/RustSampler_GUI.png)
 
 
 
